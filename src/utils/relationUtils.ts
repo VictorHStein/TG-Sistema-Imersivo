@@ -1,6 +1,25 @@
 import type { ArchitectureModel, ArchitectureEntity, ArchitectureRelation, RelationType } from '../types/architecture';
 import type { ViewMode } from '../store/useArchitectureStore';
 
+// Relations shown in each view mode (ALL = hierarchy tree only)
+const VIEW_TYPES: Record<ViewMode, RelationType[]> = {
+  ALL:          ['contains'],
+  POWER:        ['provides_power_to'],
+  DATA:         ['sends_data_to', 'communicates_with', 'uses'],
+  COMMAND:      ['receives_command_from', 'controls', 'actuates', 'measures'],
+  THERMAL:      ['thermally_coupled_to'],
+  STRUCTURAL:   ['mechanically_attached_to', 'contains'],
+  VERIFICATION: ['satisfies', 'verifies', 'validates', 'constrains', 'mitigates'],
+};
+
+export function filterRelationsByView(
+  relations: ArchitectureRelation[],
+  viewMode: ViewMode,
+): ArchitectureRelation[] {
+  const types = VIEW_TYPES[viewMode];
+  return relations.filter((r) => types.includes(r.type));
+}
+
 export function getNeighbors(
   entityId: string,
   model: ArchitectureModel,
@@ -20,22 +39,13 @@ export function getNeighbors(
   return results;
 }
 
-export function filterRelationsByView(
-  relations: ArchitectureRelation[],
-  viewMode: ViewMode,
-): ArchitectureRelation[] {
-  const VIEW_TYPES: Record<ViewMode, RelationType[]> = {
-    ALL: [],
-    POWER: ['provides_power_to', 'allocated_to'],
-    DATA: ['sends_data_to', 'communicates_with', 'uses'],
-    COMMAND: ['receives_command_from', 'controls', 'actuates'],
-    THERMAL: ['thermally_coupled_to'],
-    STRUCTURAL: ['mechanically_attached_to', 'contains'],
-    VERIFICATION: ['verifies', 'validates', 'constrains'],
-  };
-  const types = VIEW_TYPES[viewMode];
-  if (types.length === 0) return relations;
-  return relations.filter((r) => types.includes(r.type));
+export function getEntityRelations(
+  entityId: string,
+  model: ArchitectureModel,
+): { outgoing: ArchitectureRelation[]; incoming: ArchitectureRelation[] } {
+  const outgoing = model.relations.filter((r) => r.source === entityId);
+  const incoming = model.relations.filter((r) => r.target === entityId);
+  return { outgoing, incoming };
 }
 
 export function groupRelationsByType(
@@ -47,13 +57,4 @@ export function groupRelationsByType(
     result[rel.type].push(rel);
   }
   return result;
-}
-
-export function getEntityRelations(
-  entityId: string,
-  model: ArchitectureModel,
-): { outgoing: ArchitectureRelation[]; incoming: ArchitectureRelation[] } {
-  const outgoing = model.relations.filter((r) => r.source === entityId);
-  const incoming = model.relations.filter((r) => r.target === entityId);
-  return { outgoing, incoming };
 }

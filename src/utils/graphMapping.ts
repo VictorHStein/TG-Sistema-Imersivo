@@ -1,78 +1,69 @@
 import type { Node, Edge } from '@xyflow/react';
-import type { ArchitectureEntity, ArchitectureRelation, EntityType } from '../types/architecture';
-import { ENTITY_ACCENT, ENTITY_COLORS, RELATION_COLORS, ENTITY_LAYERS } from '../types/architecture';
+import type { ArchitectureEntity, ArchitectureRelation, EntityType, RelationType } from '../types/architecture';
+import { ENTITY_ACCENT, ENTITY_COLORS, RELATION_COLORS } from '../types/architecture';
+import { computeHierarchicalPositions } from './hierarchicalLayout';
 
 export interface EntityNodeData extends Record<string, unknown> {
   label: string;
   entityId: string;
   entityType: EntityType;
   status?: string;
-  layer: number;
-  color: string;
   accent: string;
-  selected: boolean;
+  color: string;
 }
 
 export type EntityNode = Node<EntityNodeData, 'entity'>;
 
-const LAYER_GAP_X = 260;
-const LAYER_GAP_Y = 90;
+export function entitiesToNodes(entities: ArchitectureEntity[], relations: ArchitectureRelation[]): EntityNode[] {
+  const positions = computeHierarchicalPositions(entities, relations);
 
-export function entitiesToNodes(
-  entities: ArchitectureEntity[],
-  selectedId: string | null,
-): EntityNode[] {
-  const byLayer: Record<number, ArchitectureEntity[]> = {};
-  for (const e of entities) {
-    const l = e.layer ?? ENTITY_LAYERS[e.type] ?? 0;
-    if (!byLayer[l]) byLayer[l] = [];
-    byLayer[l].push(e);
-  }
-
-  const nodes: EntityNode[] = [];
-  for (const [layerStr, group] of Object.entries(byLayer)) {
-    const layer = Number(layerStr);
-    group.forEach((entity, idx) => {
-      nodes.push({
-        id: entity.id,
-        type: 'entity',
-        position: {
-          x: layer * LAYER_GAP_X,
-          y: idx * LAYER_GAP_Y - ((group.length - 1) * LAYER_GAP_Y) / 2,
-        },
-        data: {
-          label: entity.name,
-          entityId: entity.id,
-          entityType: entity.type,
-          status: entity.status,
-          layer,
-          color: ENTITY_COLORS[entity.type],
-          accent: ENTITY_ACCENT[entity.type],
-          selected: entity.id === selectedId,
-        },
-      });
-    });
-  }
-  return nodes;
+  return entities.map((entity) => {
+    const pos = positions.get(entity.id) ?? { x: 0, y: 0 };
+    return {
+      id: entity.id,
+      type: 'entity',
+      position: pos,
+      data: {
+        label: entity.name,
+        entityId: entity.id,
+        entityType: entity.type,
+        status: entity.status,
+        accent: ENTITY_ACCENT[entity.type] ?? '#94a3b8',
+        color: ENTITY_COLORS[entity.type] ?? '#1e293b',
+      },
+    };
+  });
 }
 
 export function relationsToEdges(
   relations: ArchitectureRelation[],
   visibleIds: Set<string>,
+  viewMode: string,
 ): Edge[] {
   return relations
     .filter((r) => visibleIds.has(r.source) && visibleIds.has(r.target))
-    .map((rel) => ({
-      id: rel.id,
-      source: rel.source,
-      target: rel.target,
-      type: 'relation',
-      label: rel.label ?? rel.type,
-      data: { relationType: rel.type, description: rel.description },
-      style: {
-        stroke: RELATION_COLORS[rel.type] ?? '#475569',
-        strokeWidth: 1.5,
-      },
-      animated: ['sends_data_to', 'receives_command_from', 'controls'].includes(rel.type),
-    }));
+    .map((rel) => {
+      const isContains = rel.type === 'contains';
+      const color = RELATION_COLORS[rel.type as RelationType] ?? '#475569';
+      const faint = isContains && viewMode !== 'ALL' && viewMode !== 'STRUCTURAL';
+
+      return {
+        id: rel.id,
+        source: rel.source,
+        target: rel.target,
+        type: 'relation',
+        data: {
+          relationType: rel.type,
+          description: rel.description,
+          faint,
+        },
+        style: {
+          stroke: faint ? '#1e3a5f' : color,
+          strokeWidth: faint ? 1 : isContains ? 1.5 : 2,
+          opacity: faint ? 0.3 : isContains ? 0.55 : 0.9,
+        },
+        animated: !faint && ['sends_data_to', 'receives_command_from', 'controls', 'provides_power_to'].includes(rel.type),
+        zIndex: faint ? 0 : 10,
+      };
+    });
 }

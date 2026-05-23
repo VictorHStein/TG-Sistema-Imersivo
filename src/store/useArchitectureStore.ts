@@ -40,7 +40,7 @@ interface ArchitectureState {
 export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
   model: demoArchitecture,
   selectedId: 'MSN-001',
-  activeLayer: 10,
+  activeLayer: 6,
   viewMode: 'ALL',
   activePanel: 'details',
   highlightedRelationTypes: [],
