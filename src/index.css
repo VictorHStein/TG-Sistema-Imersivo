@@ -13,98 +13,207 @@ body {
   font-family: var(--font-ui);
   font-size: var(--text-base);
   color: var(--text-primary);
-  background: var(--bg-base);
   color-scheme: dark;
   line-height: 1.5;
+  /* Starfield background — darkened so content stays readable */
+  background:
+    linear-gradient(180deg, rgba(2,6,23,0.88) 0%, rgba(2,6,23,0.93) 100%),
+    url('/images/backgrounds/01_bg_space_starfield_deep.png') center / cover fixed;
 }
 
 button { font: inherit; cursor: pointer; }
-input, select { font: inherit; }
+input, select, textarea { font: inherit; }
 
-/* ── Scrollbar ─────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* ── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-accent); }
 
-/* ── App layout ────────────────────────────────────────── */
+/* ── App layout ────────────────────────────────────────────── */
 .app-root {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background: transparent;
 }
-
 .app-body {
   display: flex;
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
-
 .app-canvas {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg-base);
+  min-height: 0;
+  background: transparent;
 }
 
-/* ── Top navigation bar ────────────────────────────────── */
+/* ── Navigation bar ────────────────────────────────────────── */
 .nav-bar {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 0 12px;
-  background: var(--bg-surface);
+  padding: 0 14px;
+  background: rgba(6,11,20,0.95);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
-  height: 40px;
+  height: 42px;
+  backdrop-filter: blur(10px);
 }
-
 .nav-tab {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  border-radius: 4px;
-  font-size: var(--text-sm);
+  padding: 5px 14px;
+  border-radius: 5px;
+  font-size: 12px;
   font-family: var(--font-mono);
   color: var(--text-muted);
   background: none;
   border: 1px solid transparent;
-  transition: all var(--transition-fast);
+  transition: all 120ms ease;
 }
 .nav-tab:hover { color: var(--text-secondary); background: var(--bg-hover); }
 .nav-tab.active {
   color: var(--text-accent);
-  background: var(--bg-selected);
-  border-color: var(--border-accent);
+  background: rgba(56,189,248,0.1);
+  border-color: rgba(56,189,248,0.3);
 }
-
 .nav-spacer { flex: 1; }
-
 .view-toggle {
   display: flex;
   border: 1px solid var(--border-subtle);
-  border-radius: 4px;
+  border-radius: 5px;
   overflow: hidden;
+  background: var(--bg-card);
 }
 .view-toggle-btn {
-  padding: 4px 12px;
-  font-size: var(--text-xs);
+  padding: 4px 13px;
+  font-size: 11px;
   font-family: var(--font-mono);
-  background: var(--bg-card);
+  background: transparent;
   color: var(--text-muted);
   border: none;
-  cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 120ms ease;
 }
 .view-toggle-btn.active {
-  background: var(--bg-selected);
+  background: rgba(56,189,248,0.15);
   color: var(--text-accent);
 }
 
-/* ── Pulse animation for live indicator ───────────────── */
+/* ── Mission header ────────────────────────────────────────── */
+.mission-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 8px 20px;
+  background: rgba(6,11,20,0.97);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  backdrop-filter: blur(10px);
+}
+.mission-live-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--c-mission);
+  box-shadow: 0 0 6px var(--c-mission);
+  animation: pulse 2s infinite;
+  flex-shrink: 0;
+}
+.mission-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.03em;
+}
+.mission-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 60px;
+}
+.mission-stat__value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+.mission-stat__label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.mission-version {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  border-left: 1px solid var(--border-subtle);
+  padding-left: 14px;
+  line-height: 1.6;
+}
+
+/* ── Traceability view ─────────────────────────────────────── */
+.trace-view {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  background: transparent;
+}
+.trace-matrix {
+  border-collapse: collapse;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  width: max-content;
+}
+.trace-matrix th, .trace-matrix td {
+  border: 1px solid var(--border-subtle);
+  padding: 4px 8px;
+}
+.trace-matrix th {
+  background: rgba(13,24,38,0.8);
+  color: var(--text-muted);
+  text-align: center;
+}
+.trace-matrix td { background: transparent; }
+.trace-matrix tr.highlighted td { background: rgba(56,189,248,0.08); }
+
+/* ── Dashboard view ────────────────────────────────────────── */
+.dashboard-view {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  background: transparent;
+}
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.dashboard-card {
+  background: rgba(13,24,38,0.85);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 16px;
+  backdrop-filter: blur(8px);
+}
+.dashboard-card__title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 14px;
+}
+
+/* ── Pulse animation ───────────────────────────────────────── */
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px currentColor; }
+  50% { opacity: 0.4; box-shadow: 0 0 2px currentColor; }
 }
