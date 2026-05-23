@@ -1,0 +1,167 @@
+/* ── React Flow canvas ───────────────────────────────────────── */
+.react-flow__background { background: var(--bg-base); }
+
+.react-flow__minimap {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+.react-flow__minimap-mask { fill: rgba(6,11,20,0.6); }
+
+.react-flow__controls {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+.react-flow__controls-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.react-flow__controls-button svg { fill: currentColor; }
+
+/* ── Custom entity node ──────────────────────────────────────── */
+.entity-node {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-width: 160px;
+  max-width: 220px;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  position: relative;
+}
+.entity-node:hover {
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-glow);
+}
+.entity-node.selected {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 2px rgba(56,189,248,.25), var(--shadow-glow);
+}
+
+.entity-node__accent {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  border-radius: 6px 0 0 6px;
+}
+
+.entity-node__type {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.entity-node__name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.entity-node__id {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.entity-node__status {
+  display: inline-block;
+  font-size: 8px;
+  font-family: var(--font-mono);
+  padding: 1px 5px;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+/* ── Custom relation edge label ──────────────────────────────── */
+.edge-label {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ── View mode toolbar ───────────────────────────────────────── */
+.view-mode-bar {
+  display: flex;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+
+.view-mode-btn {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.view-mode-btn:hover { color: var(--text-secondary); border-color: var(--border-default); }
+.view-mode-btn.active {
+  background: var(--bg-selected);
+  color: var(--text-accent);
+  border-color: var(--border-accent);
+}
+
+/* ── Layer slider ────────────────────────────────────────────── */
+.layer-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.layer-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.layer-slider {
+  flex: 1;
+  accent-color: var(--text-accent);
+  cursor: pointer;
+}
+
+.layer-steps {
+  display: flex;
+  gap: 4px;
+}
+.layer-step {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border-subtle);
+  transition: background var(--transition-fast);
+}
+.layer-step.active { background: var(--text-accent); }
