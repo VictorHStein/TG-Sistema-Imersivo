@@ -84,6 +84,8 @@ function FlowCanvas() {
 
   const selectEntity = useArchitectureStore((s) => s.selectEntity);
   const selectRelation = useArchitectureStore((s) => s.selectRelation);
+  const minimapOpen = useArchitectureStore((s) => s.minimapOpen);
+  const toggleMinimap = useArchitectureStore((s) => s.toggleMinimap);
 
   const layout = useFlowLayout(architecture, visibleEntities, visibleRelations);
 
@@ -167,6 +169,19 @@ function FlowCanvas() {
   /* ── Build React Flow edges ──────────────────────────────────── */
   const flowEdges: Edge[] = useMemo(() => {
     if (!architecture) return [];
+
+    // Count how many relations exist between each (source,target) pair so we
+    // can offset parallel edges and never draw two on top of each other.
+    const pairTotals = new Map<string, number>();
+    const pairUsed = new Map<string, number>();
+    for (const r of visibleRelations) {
+      // Normalize key so A↔B and B↔A count together (parallels in any direction)
+      const a = r.source < r.target ? r.source : r.target;
+      const b = r.source < r.target ? r.target : r.source;
+      const key = `${a}|${b}`;
+      pairTotals.set(key, (pairTotals.get(key) ?? 0) + 1);
+    }
+
     return visibleRelations.map((relation) => {
       const rt = architecture.relationTypesById[relation.type];
       const source = architecture.entitiesById[relation.source];
@@ -183,6 +198,23 @@ function FlowCanvas() {
         dimmed: isDimmed,
       });
 
+      // Pair offset for parallel edges
+      const a = relation.source < relation.target ? relation.source : relation.target;
+      const b = relation.source < relation.target ? relation.target : relation.source;
+      const key = `${a}|${b}`;
+      const total = pairTotals.get(key) ?? 1;
+      const idx = pairUsed.get(key) ?? 0;
+      pairUsed.set(key, idx + 1);
+      // [-N/2 … +N/2] centred. e.g. for total=3 idx=0,1,2 → -1, 0, +1
+      const pairOffset = total > 1 ? (idx - (total - 1) / 2) : 0;
+
+      // Animate flow for "active" semantic relations (power/data/command) unless dimmed
+      const isFlowy =
+        !isDimmed &&
+        (relation.type === 'provides_power_to' ||
+         relation.type === 'sends_data_to' ||
+         relation.type === 'receives_command_from');
+
       const data: ArchitectureEdgeData = {
         relationId: relation.id,
         style: vs,
@@ -193,6 +225,9 @@ function FlowCanvas() {
         isDimmed,
         isEmphasized,
         onClick: selectRelation,
+        pairOffset,
+        pairTotal: total,
+        animated: isFlowy,
       };
 
       return {
@@ -242,6 +277,14 @@ function FlowCanvas() {
             foco: {architecture?.entitiesById[focusedSubsystemId]?.name ?? focusedSubsystemId}
           </span>
         )}
+        <div className="flow2d-toolbar__spacer" />
+        <button
+          className={`flow2d-toolbar__toggle${minimapOpen ? ' is-on' : ''}`}
+          onClick={toggleMinimap}
+          title={minimapOpen ? 'Esconder minimapa' : 'Mostrar minimapa'}
+        >
+          ▦ {minimapOpen ? 'Esconder minimapa' : 'Mostrar minimapa'}
+        </button>
       </div>
 
       <div className="flow2d-canvas">
@@ -268,18 +311,20 @@ function FlowCanvas() {
           />
           <Background variant={BackgroundVariant.Dots} color="#1e3a5f55" gap={32} size={1.2} />
           <Controls showInteractive={false} />
-          <MiniMap
-            zoomable
-            pannable
-            nodeComponent={MiniMapEntityNode}
-            nodeColor={(node) => {
-              if (node.type === 'rowbg') return 'transparent';
-              const d = node.data as ArchitectureNodeData | undefined;
-              return d?.category?.color ?? '#475569';
-            }}
-            nodeStrokeWidth={0}
-            maskColor="rgba(2,6,23,0.85)"
-          />
+          {minimapOpen && (
+            <MiniMap
+              zoomable
+              pannable
+              nodeComponent={MiniMapEntityNode}
+              nodeColor={(node) => {
+                if (node.type === 'rowbg') return 'transparent';
+                const d = node.data as ArchitectureNodeData | undefined;
+                return d?.category?.color ?? '#475569';
+              }}
+              nodeStrokeWidth={0}
+              maskColor="rgba(2,6,23,0.85)"
+            />
+          )}
         </ReactFlow>
       </div>
     </div>

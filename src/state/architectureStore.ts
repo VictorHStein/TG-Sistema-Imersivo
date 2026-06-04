@@ -42,6 +42,7 @@ interface ArchitectureState {
   /* ── Panel state ────────────────────────────────────────────── */
   sidePanelTab: SidePanelTab;
   legendOpen: boolean;
+  minimapOpen: boolean;
 
   /* ── Actions ────────────────────────────────────────────────── */
   loadArchitectureFromJson: (raw: unknown, sourceName?: string) => { ok: boolean; issues: ValidationIssue[] };
@@ -60,6 +61,7 @@ interface ArchitectureState {
   clearFocus: () => void;
   setSidePanelTab: (tab: SidePanelTab) => void;
   setLegendOpen: (open: boolean) => void;
+  toggleMinimap: () => void;
   toggleCrossCategoryOnly: () => void;
   toggleCriticalOnly: () => void;
 }
@@ -98,6 +100,7 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
 
   sidePanelTab: 'overview',
   legendOpen: true,
+  minimapOpen: false,
 
   loadArchitectureFromJson: (raw, sourceName) => {
     const result = validateArchitecture(raw);
@@ -184,6 +187,7 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
   clearFocus: () => set({ focusedSubsystemId: null }),
   setSidePanelTab: (tab) => set({ sidePanelTab: tab }),
   setLegendOpen: (open) => set({ legendOpen: open }),
+  toggleMinimap: () => set((s) => ({ minimapOpen: !s.minimapOpen })),
   toggleCrossCategoryOnly: () => set((s) => ({ showOnlyCrossCategory: !s.showOnlyCrossCategory })),
   toggleCriticalOnly: () => set((s) => ({ emphasizeOnlyCritical: !s.emphasizeOnlyCritical })),
 }));

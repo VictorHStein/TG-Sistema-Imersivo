@@ -30,6 +30,27 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+.flow2d-toolbar__spacer { flex: 1; }
+.flow2d-toolbar__toggle {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+  transition: all var(--transition-fast);
+}
+.flow2d-toolbar__toggle:hover {
+  color: var(--text-accent);
+  border-color: var(--text-accent);
+}
+.flow2d-toolbar__toggle.is-on {
+  color: var(--text-accent);
+  background: rgba(56,189,248,0.12);
+  border-color: var(--text-accent);
+}
 
 .flow2d-canvas {
   flex: 1;
@@ -249,4 +270,10 @@
   letter-spacing: 0.04em;
   text-transform: lowercase;
   white-space: nowrap;
+}
+
+/* Animated dash flow for "flowy" relations (power, data, command) */
+@keyframes arch-edge-flow {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -20; }
 }
