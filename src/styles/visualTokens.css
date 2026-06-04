@@ -1,68 +1,42 @@
-/* NASA Mission Control Design Tokens */
+/* Mission Control Design Tokens */
 :root {
   /* ── Backgrounds ─────────────────────────── */
-  --bg-base:      #060b14;
-  --bg-surface:   #0d1826;
-  --bg-panel:     #0f1f35;
-  --bg-card:      #122240;
-  --bg-hover:     #1a2f50;
-  --bg-selected:  #1e3a6e;
+  --bg-base:      #02050f;
+  --bg-surface:   #06101f;
+  --bg-panel:     #0a1a30;
+  --bg-card:      #0d1f3a;
+  --bg-hover:     #143058;
+  --bg-selected:  #1a3e76;
 
-  /* ── Entity type colors ──────────────────── */
-  --c-mission:      #38bdf8;
-  --c-objective:    #22d3ee;
-  --c-requirement:  #facc15;
-  --c-function:     #a78bfa;
-  --c-system:       #4ade80;
-  --c-segment:      #34d399;
-  --c-subsystem:    #60a5fa;
-  --c-component:    #94a3b8;
-  --c-interface:    #fb923c;
-  --c-budget:       #86efac;
-  --c-risk:         #f87171;
-  --c-verification: #4ade80;
-  --c-test:         #93c5fd;
-  --c-operation:    #818cf8;
-  --c-model:        #c4b5fd;
-
-  /* ── Relation type colors ────────────────── */
-  --r-contains:               #475569;
-  --r-satisfies:              #22d3ee;
-  --r-allocated_to:           #a78bfa;
-  --r-verifies:               #4ade80;
-  --r-depends_on:             #64748b;
-  --r-provides_power_to:      #facc15;
-  --r-sends_data_to:          #38bdf8;
-  --r-receives_command_from:  #818cf8;
-  --r-mechanically_attached:  #94a3b8;
-  --r-thermally_coupled:      #fb923c;
-  --r-controls:               #86efac;
-  --r-measures:               #7dd3fc;
-  --r-actuates:               #bbf7d0;
-  --r-communicates_with:      #67e8f9;
-  --r-constrains:             #f87171;
-  --r-mitigates:              #34d399;
-  --r-uses:                   #c4b5fd;
-  --r-validates:              #e0f2fe;
-
-  /* ── Status colors ───────────────────────── */
-  --s-verified:    #4ade80;
-  --s-in-progress: #38bdf8;
-  --s-draft:       #94a3b8;
-  --s-failed:      #f87171;
-  --s-open:        #fb923c;
-  --s-passed:      #86efac;
+  --bg-panel-glass: rgba(8, 16, 30, 0.78);
+  --bg-card-glass:  rgba(13, 25, 46, 0.82);
 
   /* ── Text ────────────────────────────────── */
-  --text-primary:   #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-muted:     #475569;
+  --text-primary:   #e6edf7;
+  --text-secondary: #9fb1cd;
+  --text-muted:     #5e7595;
   --text-accent:    #38bdf8;
 
   /* ── Borders ─────────────────────────────── */
-  --border-subtle:  #1e3a5f;
-  --border-default: #1d3d60;
+  --border-subtle:  rgba(56, 189, 248, 0.12);
+  --border-default: rgba(56, 189, 248, 0.22);
   --border-accent:  #38bdf8;
+  --border-warm:    rgba(248, 113, 113, 0.4);
+
+  /* ── Status colors ───────────────────────── */
+  --s-verified:    #4ade80;
+  --s-passed:      #86efac;
+  --s-in-progress: #38bdf8;
+  --s-planned:     #94a3b8;
+  --s-failed:      #f87171;
+  --s-open:        #fb923c;
+  --s-waived:      #c4b5fd;
+
+  /* ── Criticality colors ──────────────────── */
+  --crit-low:      #4ade80;
+  --crit-medium:   #facc15;
+  --crit-high:     #fb923c;
+  --crit-critical: #f87171;
 
   /* ── Spacing ─────────────────────────────── */
   --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;
@@ -72,15 +46,21 @@
   /* ── Typography ──────────────────────────── */
   --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
   --font-ui: 'Inter', system-ui, sans-serif;
-  --text-xs: 10px; --text-sm: 12px; --text-base: 14px;
-  --text-md: 16px; --text-lg: 18px; --text-xl: 22px;
+  --text-xs: 10px; --text-sm: 12px; --text-base: 13px;
+  --text-md: 15px; --text-lg: 17px; --text-xl: 22px;
 
   /* ── Shadows ─────────────────────────────── */
-  --shadow-card: 0 2px 12px rgba(0,0,0,0.6);
-  --shadow-glow: 0 0 12px rgba(56,189,248,0.2);
-  --shadow-risk: 0 0 8px rgba(248,113,113,0.3);
+  --shadow-card: 0 4px 18px rgba(0,0,0,0.5);
+  --shadow-glow: 0 0 16px rgba(56,189,248,0.28);
+  --shadow-risk: 0 0 10px rgba(248,113,113,0.34);
 
   /* ── Transitions ─────────────────────────── */
   --transition-fast: 120ms ease;
   --transition-base: 220ms ease;
+
+  /* ── Layout ──────────────────────────────── */
+  --left-panel-w:  300px;
+  --right-panel-w: 360px;
+  --topbar-h: 56px;
+  --timeline-h: 64px;
 }
