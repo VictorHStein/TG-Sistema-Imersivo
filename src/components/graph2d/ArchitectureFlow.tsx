@@ -19,8 +19,8 @@ import { useFlowLayout, NODE_WIDTH, NODE_HEIGHT } from './useFlowLayout';
 import { getRelationVisualStyle } from '../../domain/parser/relationStyle';
 import {
   useArchitectureStore,
-  selectVisibleEntities,
-  selectVisibleRelations,
+  computeVisibleEntities,
+  computeVisibleRelations,
 } from '../../state/architectureStore';
 
 const NODE_TYPES = { entity: ArchitectureNode, rowbg: RowBackground } as const;
@@ -47,8 +47,14 @@ function FlowCanvas() {
   const visibleCategories = useArchitectureStore((s) => s.visibleCategories);
   const showOnlyCrossCategory = useArchitectureStore((s) => s.showOnlyCrossCategory);
 
-  const visibleEntities = useArchitectureStore(selectVisibleEntities);
-  const visibleRelations = useArchitectureStore(selectVisibleRelations);
+  const visibleEntities = useMemo(
+    () => computeVisibleEntities(architecture, visibleCategories, explorationMode, currentStep),
+    [architecture, visibleCategories, explorationMode, currentStep],
+  );
+  const visibleRelations = useMemo(
+    () => computeVisibleRelations(architecture, visibleEntities, visibleRelationTypes, explorationMode, currentStep, showOnlyCrossCategory),
+    [architecture, visibleEntities, visibleRelationTypes, explorationMode, currentStep, showOnlyCrossCategory],
+  );
 
   const selectEntity = useArchitectureStore((s) => s.selectEntity);
   const selectRelation = useArchitectureStore((s) => s.selectRelation);

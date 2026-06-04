@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import {
   useArchitectureStore,
-  selectVisibleEntities,
+  computeVisibleEntities,
 } from '../../state/architectureStore';
 import { use3DLayout } from './use3DLayout';
 
@@ -18,7 +18,14 @@ export function SceneMiniMap() {
   const selectedId = useArchitectureStore((s) => s.selectedEntityId);
   const focusSubsystem = useArchitectureStore((s) => s.focusedSubsystemId);
   const selectEntity = useArchitectureStore((s) => s.selectEntity);
-  const visibleEntities = useArchitectureStore(selectVisibleEntities);
+  const visibleCategories = useArchitectureStore((s) => s.visibleCategories);
+  const explorationMode = useArchitectureStore((s) => s.explorationMode);
+  const currentStep = useArchitectureStore((s) => s.currentStep);
+
+  const visibleEntities = useMemo(
+    () => computeVisibleEntities(architecture, visibleCategories, explorationMode, currentStep),
+    [architecture, visibleCategories, explorationMode, currentStep],
+  );
   const layout = use3DLayout(architecture);
 
   const points = useMemo(() => {

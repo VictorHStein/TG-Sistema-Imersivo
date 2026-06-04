@@ -6,8 +6,8 @@ import { Vector3 } from 'three';
 
 import {
   useArchitectureStore,
-  selectVisibleEntities,
-  selectVisibleRelations,
+  computeVisibleEntities,
+  computeVisibleRelations,
 } from '../../state/architectureStore';
 import { EntityMesh } from './EntityMesh';
 import { RelationTube } from './RelationTube';
@@ -72,8 +72,20 @@ function SceneContent({
   const selectEntity = useArchitectureStore((s) => s.selectEntity);
   const selectRelation = useArchitectureStore((s) => s.selectRelation);
 
-  const visibleEntities = useArchitectureStore(selectVisibleEntities);
-  const visibleRelations = useArchitectureStore(selectVisibleRelations);
+  const visibleCategories = useArchitectureStore((s) => s.visibleCategories);
+  const visibleRelationTypes = useArchitectureStore((s) => s.visibleRelationTypes);
+  const explorationMode = useArchitectureStore((s) => s.explorationMode);
+  const currentStep = useArchitectureStore((s) => s.currentStep);
+  const showOnlyCrossCategory = useArchitectureStore((s) => s.showOnlyCrossCategory);
+
+  const visibleEntities = useMemo(
+    () => computeVisibleEntities(architecture, visibleCategories, explorationMode, currentStep),
+    [architecture, visibleCategories, explorationMode, currentStep],
+  );
+  const visibleRelations = useMemo(
+    () => computeVisibleRelations(architecture, visibleEntities, visibleRelationTypes, explorationMode, currentStep, showOnlyCrossCategory),
+    [architecture, visibleEntities, visibleRelationTypes, explorationMode, currentStep, showOnlyCrossCategory],
+  );
 
   const layout = use3DLayout(architecture);
 

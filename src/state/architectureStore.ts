@@ -1,5 +1,9 @@
 import { create } from 'zustand';
-import type { NormalizedArchitecture } from '../domain/model/ArchitectureTypes';
+import type {
+  ArchitectureEntity,
+  ArchitectureRelation,
+  NormalizedArchitecture,
+} from '../domain/model/ArchitectureTypes';
 import { normalizeArchitecture } from '../domain/parser/normalizeArchitecture';
 import { validateArchitecture, type ValidationIssue } from '../domain/parser/validateArchitecture';
 import demoJson from '../data/demoArchitecture.json';
@@ -184,35 +188,56 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
   toggleCriticalOnly: () => set((s) => ({ emphasizeOnlyCritical: !s.emphasizeOnlyCritical })),
 }));
 
-/* ── Selectors ────────────────────────────────────────────────── */
+/* ── Helpers ──────────────────────────────────────────────────
+ *
+ * These take the primitives explicitly so consumers can wrap them in `useMemo`
+ * with the right dependency list. We deliberately do NOT export them as
+ * Zustand selectors (`useStore(selector)`), because the selectors return new
+ * arrays on every call which breaks React's `useSyncExternalStore` ref check
+ * and produces an infinite render loop inside React Flow.
+ */
 
-export const selectVisibleEntities = (state: ArchitectureState) => {
-  const a = state.architecture;
-  if (!a) return [];
-  return a.entities.filter((e) => {
-    if (!state.visibleCategories.has(e.category)) return false;
-    if (state.explorationMode === 'step' && e.step > state.currentStep) return false;
+export function computeVisibleEntities(
+  architecture: NormalizedArchitecture | null,
+  visibleCategories: Set<string>,
+  explorationMode: ExplorationMode,
+  currentStep: number,
+): ArchitectureEntity[] {
+  if (!architecture) return [];
+  return architecture.entities.filter((e) => {
+    if (!visibleCategories.has(e.category)) return false;
+    if (explorationMode === 'step' && e.step > currentStep) return false;
     return true;
   });
-};
+}
 
-export const selectVisibleRelations = (state: ArchitectureState) => {
-  const a = state.architecture;
-  if (!a) return [];
-  const visibleEntityIds = new Set(selectVisibleEntities(state).map((e) => e.id));
-  return a.relations.filter((r) => {
-    if (!state.visibleRelationTypes.has(r.type)) return false;
-    if (state.explorationMode === 'step' && r.step > state.currentStep) return false;
-    if (!visibleEntityIds.has(r.source) || !visibleEntityIds.has(r.target)) return false;
-    if (state.showOnlyCrossCategory) {
-      const s = a.entitiesById[r.source];
-      const t = a.entitiesById[r.target];
+export function computeVisibleRelations(
+  architecture: NormalizedArchitecture | null,
+  visibleEntities: ArchitectureEntity[],
+  visibleRelationTypes: Set<string>,
+  explorationMode: ExplorationMode,
+  currentStep: number,
+  showOnlyCrossCategory: boolean,
+): ArchitectureRelation[] {
+  if (!architecture) return [];
+  const visibleIds = new Set(visibleEntities.map((e) => e.id));
+  return architecture.relations.filter((r) => {
+    if (!visibleRelationTypes.has(r.type)) return false;
+    if (explorationMode === 'step' && r.step > currentStep) return false;
+    if (!visibleIds.has(r.source) || !visibleIds.has(r.target)) return false;
+    if (showOnlyCrossCategory) {
+      const s = architecture.entitiesById[r.source];
+      const t = architecture.entitiesById[r.target];
       if (!s || !t || s.category === t.category) return false;
     }
     return true;
   });
-};
+}
 
+/**
+ * Selectors that return the SAME object reference when nothing relevant
+ * changed. Safe to use as `useArchitectureStore(selectSelectedEntity)`.
+ */
 export const selectSelectedEntity = (state: ArchitectureState) => {
   const a = state.architecture;
   if (!a || !state.selectedEntityId) return null;
