@@ -8,7 +8,7 @@ import { normalizeArchitecture } from '../domain/parser/normalizeArchitecture';
 import { validateArchitecture, type ValidationIssue } from '../domain/parser/validateArchitecture';
 import demoJson from '../data/demoArchitecture.json';
 
-export type ViewMode = '2d' | '3d' | 'split';
+export type ViewMode = '2d' | '3d' | 'split' | 'tutorial';
 export type ExplorationMode = 'all' | 'step' | 'focus';
 export type SidePanelTab = 'details' | 'budgets' | 'verifications' | 'risks' | 'overview';
 

@@ -115,21 +115,25 @@ function SceneContent({
 
   return (
     <>
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[12, 16, 8]} intensity={1.0} color="#ffffff" />
-      <pointLight position={[-12, 8, -8]} intensity={0.4} color="#5b85ff" />
-      <pointLight position={[0, -10, 0]} intensity={0.25} color="#a78bfa" />
+      <ambientLight intensity={0.55} />
+      <directionalLight position={[12, 16, 8]} intensity={1.1} color="#ffffff" />
+      <pointLight position={[-12, 8, -8]} intensity={0.5} color="#5b85ff" />
+      <pointLight position={[0, -10, 0]} intensity={0.3} color="#a78bfa" />
+      <pointLight position={[0, 6, 0]} intensity={0.4} color="#38bdf8" distance={20} />
 
-      <Stars radius={120} depth={70} count={4500} factor={3.2} saturation={0} fade />
+      <Stars radius={120} depth={70} count={5500} factor={3.5} saturation={0} fade />
 
-      {/* Subtle central platform — anchor for the radial fan */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -3.6, 0]}>
-        <ringGeometry args={[2.0, 2.4, 64]} />
+      {/* Radial-fan platform — concentric rings one per layer */}
+      {[2.4, 5.0, 7.0, 9.5, 12.5, 14.5].map((r, i) => (
+        <mesh key={r} rotation={[Math.PI / 2, 0, 0]} position={[0, -3.6, 0]}>
+          <ringGeometry args={[r, r + 0.06, 96]} />
+          <meshBasicMaterial color="#38bdf8" opacity={i === 0 ? 0.22 : 0.08} transparent />
+        </mesh>
+      ))}
+      {/* Center marker */}
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -3.55, 0]}>
+        <circleGeometry args={[0.6, 36]} />
         <meshBasicMaterial color="#38bdf8" opacity={0.18} transparent />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -3.6, 0]}>
-        <ringGeometry args={[9.0, 9.2, 96]} />
-        <meshBasicMaterial color="#38bdf8" opacity={0.08} transparent />
       </mesh>
 
       <CameraFocus target={focusTarget} controlsRef={controlsRef} />
@@ -154,6 +158,7 @@ function SceneContent({
             entity={entity}
             category={cat}
             position={[pos.x, pos.y, pos.z]}
+            breakdownCode={architecture.breakdownCodes[entity.id]}
             isSelected={isSelected}
             isHighlighted={isHighlighted && !isSelected}
             isDimmed={isDimmed}

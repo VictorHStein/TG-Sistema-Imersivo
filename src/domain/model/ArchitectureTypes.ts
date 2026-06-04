@@ -149,6 +149,20 @@ export interface ArchitectureInput {
   views?: ViewSettings;
 }
 
+/**
+ * Trace chain for one entity — the path of artefacts that justify its
+ * existence according to the MBSE V-model (Mission → Requirement → Function
+ * → Subsystem → Component, with Verifications closing the loop).
+ */
+export interface TraceChain {
+  mission?: string;
+  requirement?: string;
+  function?: string;
+  subsystem?: string;
+  component?: string;
+  verifications: string[];
+}
+
 /** Architecture after normalization — entity/relation lookups + step bounds. */
 export interface NormalizedArchitecture extends ArchitectureInput {
   entitiesById: Record<string, ArchitectureEntity>;
@@ -157,4 +171,21 @@ export interface NormalizedArchitecture extends ArchitectureInput {
   maxStep: number;
   /** Convenience: relations indexed by entity id (both directions). */
   relationsByEntity: Record<string, { incoming: ArchitectureRelation[]; outgoing: ArchitectureRelation[] }>;
+  /**
+   * Hierarchical breakdown code per entity, computed automatically.
+   *
+   *  - Mission        → "1"
+   *  - Subsystems     → "1.1", "1.2", "1.3", … (children of the mission)
+   *  - Components     → "1.1.1", "1.1.2", … (children of their parent subsystem)
+   *  - Requirements   → "R-001", "R-002", …  (flat in requirement order)
+   *  - Functions      → "F-001", "F-002", …
+   *  - Verifications  → "V-001", "V-002", …
+   *
+   * This is the WBS/PBS-style codification used in systems engineering for
+   * traceability. The first part chains physical decomposition, the
+   * R/F/V prefixes mark logical artefacts.
+   */
+  breakdownCodes: Record<string, string>;
+  /** Pre-computed trace chain (Mission → Req → Fn → Sub → Comp + Verifs) per entity. */
+  traceById: Record<string, TraceChain>;
 }

@@ -7,6 +7,7 @@ import type {
   ArchitectureEntity,
   ArchitectureRelation,
   NormalizedArchitecture,
+  TraceChain,
 } from '../../domain/model/ArchitectureTypes';
 
 /**
@@ -186,16 +187,23 @@ function EntityDetails({
   const verifications = (architecture.verifications ?? []).filter(
     (v) => v.requirementId === entity.id,
   );
+  const code = architecture.breakdownCodes[entity.id] ?? entity.id;
+  const trace = architecture.traceById[entity.id];
 
   return (
     <div className="side-entity">
       <div className="side-entity__cat" style={{ color: cat?.color }}>
         <span className="cat-dot" style={{ background: cat?.color }} />
         {cat?.label}
+        <span className="side-entity__code" style={{ color: cat?.color, borderColor: `${cat?.color}55`, background: `${cat?.color}1a` }}>
+          {code}
+        </span>
       </div>
       <h2 className="side-h2">{entity.name}</h2>
       <div className="side-version">{entity.id} · etapa {entity.step}</div>
       {entity.description && <p className="side-paragraph">{entity.description}</p>}
+
+      {trace && <TraceChainView trace={trace} architecture={architecture} onSelect={onSelect} currentId={entity.id} />}
 
       <button
         className={`focus-btn${focusedId === entity.id ? ' is-on' : ''}`}
@@ -333,6 +341,84 @@ function RelationsList({
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+/* ── Trace chain (Mission → Req → Fn → Sub → Comp + Verifs) ─── */
+
+function TraceChainView({
+  trace,
+  architecture,
+  onSelect,
+  currentId,
+}: {
+  trace: TraceChain;
+  architecture: NormalizedArchitecture;
+  onSelect: (id: string) => void;
+  currentId: string;
+}) {
+  type Step = { key: string; label: string; entityId: string };
+  const steps: Step[] = [];
+  if (trace.mission)     steps.push({ key: 'M', label: 'Missão',      entityId: trace.mission });
+  if (trace.requirement) steps.push({ key: 'R', label: 'Requisito',   entityId: trace.requirement });
+  if (trace.function)    steps.push({ key: 'F', label: 'Função',      entityId: trace.function });
+  if (trace.subsystem)   steps.push({ key: 'S', label: 'Subsistema',  entityId: trace.subsystem });
+  if (trace.component)   steps.push({ key: 'C', label: 'Componente',  entityId: trace.component });
+
+  if (steps.length === 0 && trace.verifications.length === 0) return null;
+
+  return (
+    <section className="side-section side-trace">
+      <div className="side-section__title">Rastreabilidade</div>
+      <div className="trace-chain">
+        {steps.map((s, i) => {
+          const ent = architecture.entitiesById[s.entityId];
+          const cat = ent ? architecture.categoriesById[ent.category] : undefined;
+          const code = architecture.breakdownCodes[s.entityId] ?? '';
+          const isCurrent = s.entityId === currentId;
+          return (
+            <div key={s.key} className="trace-chain__row">
+              <button
+                className={`trace-chain__step${isCurrent ? ' is-current' : ''}`}
+                style={{ borderColor: cat?.color, color: cat?.color }}
+                onClick={() => onSelect(s.entityId)}
+                title={ent?.name}
+              >
+                <span className="trace-chain__role">{s.label}</span>
+                <span className="trace-chain__code">{code}</span>
+                <span className="trace-chain__name">{ent?.name ?? s.entityId}</span>
+              </button>
+              {i < steps.length - 1 && <div className="trace-chain__arrow">▼</div>}
+            </div>
+          );
+        })}
+        {trace.verifications.length > 0 && (
+          <>
+            <div className="trace-chain__arrow">↩</div>
+            <div className="trace-chain__verifs">
+              <div className="trace-chain__verifs-head">Verificações fechando o loop</div>
+              {trace.verifications.map((vid) => {
+                const v = architecture.entitiesById[vid];
+                const cat = v ? architecture.categoriesById[v.category] : undefined;
+                const code = architecture.breakdownCodes[vid] ?? '';
+                return (
+                  <button
+                    key={vid}
+                    className={`trace-chain__step trace-chain__step--verif${vid === currentId ? ' is-current' : ''}`}
+                    style={{ borderColor: cat?.color, color: cat?.color }}
+                    onClick={() => onSelect(vid)}
+                  >
+                    <span className="trace-chain__role">Verifica</span>
+                    <span className="trace-chain__code">{code}</span>
+                    <span className="trace-chain__name">{v?.name ?? vid}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
     </section>
   );
 }

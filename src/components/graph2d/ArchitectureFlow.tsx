@@ -9,6 +9,7 @@ import {
   useReactFlow,
   type Node,
   type Edge,
+  type MiniMapNodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -26,10 +27,35 @@ import {
 const NODE_TYPES = { entity: ArchitectureNode, rowbg: RowBackground } as const;
 const EDGE_TYPES = { architecture: ArchitectureEdge } as const;
 
-function FitOnChange({ depend }: { depend: unknown[] }) {
+/**
+ * Custom minimap node renderer:
+ *  - Row backgrounds are hidden (they would dwarf entity dots otherwise).
+ *  - Entity dots are drawn larger so they're visible at small minimap sizes.
+ */
+function MiniMapEntityNode({ x, y, width, height, color, id }: MiniMapNodeProps) {
+  if (typeof id === 'string' && id.startsWith('row-')) return null;
+  // Inflate small nodes so they read on the minimap
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+  const r = Math.max(width, height) * 0.7;
+  return (
+    <circle cx={cx} cy={cy} r={r} fill={color} stroke="rgba(2,6,16,0.6)" strokeWidth={4} />
+  );
+}
+
+function FitOnChange({ depend, entityIds }: { depend: unknown[]; entityIds: string[] }) {
   const { fitView } = useReactFlow();
   useEffect(() => {
-    const t = setTimeout(() => fitView({ padding: 0.15, duration: 350 }), 80);
+    const t = setTimeout(
+      () => fitView({
+        padding: 0.06,
+        duration: 450,
+        maxZoom: 1.4,
+        // Only entity nodes — ignore the wide swimlane backgrounds when fitting.
+        nodes: entityIds.map((id) => ({ id })),
+      }),
+      80,
+    );
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, depend);
@@ -82,8 +108,8 @@ function FlowCanvas() {
   const flowNodes: Node[] = useMemo(() => {
     if (!architecture) return [];
     const rowWidth =
-      Math.max(layout.bounds.maxX - layout.bounds.minX, NODE_WIDTH) + 400;
-    const rowX = layout.bounds.minX - 200;
+      Math.max(layout.bounds.maxX - layout.bounds.minX, NODE_WIDTH) + 140;
+    const rowX = layout.bounds.minX - 70;
 
     const rowNodes: Node[] = layout.rows.map((row) => ({
       id: `row-${row.id}`,
@@ -120,6 +146,7 @@ function FlowCanvas() {
         isHighlighted: isHighlighted && !isSelected,
         step: entity.step,
         parentId: entity.parentId,
+        breakdownCode: architecture.breakdownCodes[entity.id] ?? entity.id,
       };
       return {
         id: entity.id,
@@ -228,18 +255,23 @@ function FlowCanvas() {
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={true}
-          minZoom={0.08}
-          maxZoom={1.8}
+          minZoom={0.2}
+          maxZoom={2.5}
+          defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
           colorMode="dark"
           proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{ type: 'architecture' }}
         >
-          <FitOnChange depend={[architecture?.metadata.version, visibleCategories.size, visibleRelationTypes.size, explorationMode, currentStep]} />
+          <FitOnChange
+            depend={[architecture?.metadata.version, visibleCategories.size, visibleRelationTypes.size, explorationMode, currentStep]}
+            entityIds={visibleEntities.map((e) => e.id)}
+          />
           <Background variant={BackgroundVariant.Dots} color="#1e3a5f55" gap={32} size={1.2} />
           <Controls showInteractive={false} />
           <MiniMap
             zoomable
             pannable
+            nodeComponent={MiniMapEntityNode}
             nodeColor={(node) => {
               if (node.type === 'rowbg') return 'transparent';
               const d = node.data as ArchitectureNodeData | undefined;

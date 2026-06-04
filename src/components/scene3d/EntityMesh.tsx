@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import type { Mesh } from 'three';
+import type { Group, Mesh } from 'three';
 import type {
   ArchitectureEntity,
   CategoryDef,
@@ -11,6 +11,7 @@ interface EntityMeshProps {
   entity: ArchitectureEntity;
   category: CategoryDef;
   position: [number, number, number];
+  breakdownCode?: string;
   isSelected: boolean;
   isHighlighted: boolean;
   isDimmed: boolean;
@@ -20,21 +21,26 @@ interface EntityMeshProps {
 
 const SIZE_BY_CATEGORY: Record<string, number> = {
   mission: 1.1,
-  requirement: 0.6,
-  function: 0.65,
-  subsystem: 0.95,
-  component: 0.45,
-  verification: 0.55,
+  requirement: 0.55,
+  function: 0.6,
+  subsystem: 0.9,
+  component: 0.42,
+  verification: 0.5,
 };
 
 /**
  * Renders a single entity in 3D using a primitive whose shape depends on
  * `category.shape3D`. Hover/select/dim are derived from store flags.
+ *
+ * Selected entities slowly spin. All entities bob up and down with a gentle
+ * sinusoid (different phase per id) so the scene feels alive without being
+ * distracting.
  */
 export function EntityMesh({
   entity,
   category,
   position,
+  breakdownCode,
   isSelected,
   isHighlighted,
   isDimmed,
@@ -42,20 +48,32 @@ export function EntityMesh({
   onSelect,
 }: EntityMeshProps) {
   const ref = useRef<Mesh>(null);
+  const groupRef = useRef<Group>(null);
   const [hovered, setHovered] = useState(false);
   const shape = category.shape3D ?? 'box';
-  const baseSize = SIZE_BY_CATEGORY[entity.category] ?? 0.7;
+  const baseSize = SIZE_BY_CATEGORY[entity.category] ?? 0.6;
 
-  const opacity = isDimmed ? 0.25 : isSelected ? 1 : isHighlighted ? 0.95 : 0.82;
-  const emissiveIntensity = isSelected ? 0.7 : isHighlighted ? 0.35 : hovered ? 0.4 : 0.15;
+  // Phase per id so each entity bobs differently
+  const phase = useMemo(() => {
+    let h = 0;
+    for (let i = 0; i < entity.id.length; i++) h = (h * 31 + entity.id.charCodeAt(i)) % 360;
+    return (h / 360) * Math.PI * 2;
+  }, [entity.id]);
 
-  useFrame((_, dt) => {
-    if (!ref.current) return;
-    if (isSelected) ref.current.rotation.y += dt * 0.4;
+  const opacity = isDimmed ? 0.22 : isSelected ? 1 : isHighlighted ? 0.96 : 0.85;
+  const emissiveIntensity = isSelected ? 0.85 : isHighlighted ? 0.4 : hovered ? 0.5 : 0.2;
+
+  useFrame((state, dt) => {
+    if (!ref.current || !groupRef.current) return;
+    if (isSelected) ref.current.rotation.y += dt * 0.5;
+    // Gentle vertical bob (slower for dimmed)
+    const t = state.clock.elapsedTime;
+    const amp = isDimmed ? 0.0 : isSelected ? 0.18 : 0.08;
+    groupRef.current.position.y = position[1] + Math.sin(t * 0.5 + phase) * amp;
   });
 
   return (
-    <group position={position}>
+    <group ref={groupRef} position={position}>
       <mesh
         ref={ref}
         onClick={(e) => { e.stopPropagation(); onSelect(entity.id); }}
@@ -70,31 +88,40 @@ export function EntityMesh({
           transparent
           opacity={opacity}
           metalness={0.55}
-          roughness={0.35}
+          roughness={0.32}
         />
       </mesh>
 
-      {/* Selection halo */}
+      {/* Selection halo + outline ring */}
       {isSelected && (
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[baseSize + 0.4, 0.05, 12, 48]} />
-          <meshBasicMaterial color={category.color} transparent opacity={0.85} />
-        </mesh>
+        <>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[baseSize + 0.45, 0.05, 12, 64]} />
+            <meshBasicMaterial color={category.color} transparent opacity={0.85} />
+          </mesh>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[baseSize + 0.7, 0.018, 8, 64]} />
+            <meshBasicMaterial color={category.color} transparent opacity={0.4} />
+          </mesh>
+        </>
       )}
 
       {showLabel && (
         <>
+          {/* Breakdown code chip — always visible for labelled entities */}
+          {breakdownCode && (
+            <TextBillboard
+              position={[0, baseSize + 0.85, 0]}
+              text={breakdownCode}
+              color={isSelected ? category.color : '#cbd5e1'}
+              size={isSelected ? 0.28 : 0.22}
+            />
+          )}
           <TextBillboard
-            position={[0, baseSize + 0.55, 0]}
+            position={[0, baseSize + 0.5, 0]}
             text={truncate(entity.name, 28)}
-            color={isSelected ? category.color : isHighlighted ? '#e2e8f0' : '#a3b5cf'}
-            size={isSelected ? 0.32 : 0.26}
-          />
-          <TextBillboard
-            position={[0, baseSize + 0.25, 0]}
-            text={entity.id}
-            color={isSelected ? category.color : '#5e7595'}
-            size={0.18}
+            color={isSelected ? category.color : isHighlighted ? '#e6edf7' : '#a3b5cf'}
+            size={isSelected ? 0.32 : 0.24}
           />
         </>
       )}

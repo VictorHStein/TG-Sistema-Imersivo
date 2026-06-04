@@ -5,10 +5,10 @@ import type {
   NormalizedArchitecture,
 } from '../../domain/model/ArchitectureTypes';
 
-export const NODE_WIDTH = 220;
+export const NODE_WIDTH = 200;
 export const NODE_HEIGHT = 86;
-const COL_GAP = 60;
-const ROW_GAP = 150;
+const COL_GAP = 32;
+const ROW_GAP = 110;
 
 /**
  * Layered top-to-bottom layout: each category is a horizontal row.

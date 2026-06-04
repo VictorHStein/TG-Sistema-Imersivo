@@ -12,6 +12,8 @@ export interface ArchitectureNodeData extends Record<string, unknown> {
   isHighlighted: boolean;
   step: number;
   parentId?: string;
+  /** WBS/PBS-style hierarchical code, e.g. "1.2.1". */
+  breakdownCode: string;
 }
 
 /**
@@ -39,6 +41,9 @@ function ArchitectureNodeImpl({ data }: NodeProps) {
         <div className="arch-node__category" style={{ color }}>
           <span className="arch-node__cat-dot" style={{ background: color }} />
           {d.category.label}
+          <span className="arch-node__breakdown" style={{ background: `${color}22`, color, borderColor: `${color}55` }}>
+            {d.breakdownCode}
+          </span>
         </div>
         <div className="arch-node__name" title={d.name}>{d.name}</div>
         <div className="arch-node__meta">
