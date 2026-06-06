@@ -42,35 +42,55 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
 
   const dx = targetX - sourceX;
   const dy = targetY - sourceY;
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
   const isIntraRow = Math.abs(dy) < 12;
 
-  let mx: number;
-  let my: number;
+  let path: string;
+  let labelX: number;
+  let labelY: number;
 
   if (isIntraRow) {
-    // Force a strong upward arc above the row. Tall enough to clear card
-    // heights (~86px) plus padding. Parallel edges fan out by index.
+    // Strong upward bezier arc above the row so edges between subsystems
+    // don't cross intermediate cards. Parallel edges fan out vertically.
     const horizDist = Math.abs(dx);
     const arcHeight = Math.max(110, Math.min(horizDist * 0.32, 220));
-    mx = (sourceX + targetX) / 2 + d.pairOffset * 22;
-    my = (sourceY + targetY) / 2 - arcHeight - Math.abs(d.pairOffset) * 18;
+    const mx = (sourceX + targetX) / 2 + d.pairOffset * 22;
+    const my = (sourceY + targetY) / 2 - arcHeight - Math.abs(d.pairOffset) * 18;
+    path = `M ${sourceX} ${sourceY} Q ${mx} ${my} ${targetX} ${targetY}`;
+    labelX = 0.25 * sourceX + 0.5 * mx + 0.25 * targetX;
+    labelY = 0.25 * sourceY + 0.5 * my + 0.25 * targetY;
   } else {
-    // Cross-row: perpendicular bezier with parallel-edge offset.
-    const px = -dy / len;
-    const py = dx / len;
-    const baseCurl = Math.min(len * 0.18, 60);
-    const parallelOffset = d.pairOffset * 60;
-    const offset = baseCurl + parallelOffset;
-    mx = (sourceX + targetX) / 2 + px * offset;
-    my = (sourceY + targetY) / 2 + py * offset;
+    // Cross-row: orthogonal "step" routing. The edge leaves the source
+    // vertically, runs along a horizontal lane between the rows, then
+    // descends vertically into the target. This never crosses through
+    // a card — each segment is in the gap between rows or in the
+    // vertical channel a node occupies.
+    //
+    // Parallel edges between the same pair offset their lane by `pairOffset`.
+    const laneY = sourceY + dy / 2 + d.pairOffset * 22;
+    const r = 16; // corner radius
+    // If horizontal distance is small, the rounded corners would overlap →
+    // fall back to a smooth bezier
+    if (Math.abs(dx) < r * 2 + 4) {
+      const cx = (sourceX + targetX) / 2 + d.pairOffset * 28;
+      path = `M ${sourceX} ${sourceY} C ${cx} ${laneY} ${cx} ${laneY} ${targetX} ${targetY}`;
+      labelX = (sourceX + targetX) / 2;
+      labelY = laneY;
+    } else {
+      const dir = dx > 0 ? 1 : -1;
+      path = [
+        `M ${sourceX} ${sourceY}`,
+        `L ${sourceX} ${laneY - r * Math.sign(dy)}`,
+        // Round corner from vertical → horizontal
+        `Q ${sourceX} ${laneY} ${sourceX + r * dir} ${laneY}`,
+        `L ${targetX - r * dir} ${laneY}`,
+        // Round corner from horizontal → vertical
+        `Q ${targetX} ${laneY} ${targetX} ${laneY + r * Math.sign(dy)}`,
+        `L ${targetX} ${targetY}`,
+      ].join(' ');
+      labelX = (sourceX + targetX) / 2;
+      labelY = laneY;
+    }
   }
-
-  const path = `M ${sourceX} ${sourceY} Q ${mx} ${my} ${targetX} ${targetY}`;
-
-  // Bezier midpoint at t=0.5
-  const labelX = 0.25 * sourceX + 0.5 * mx + 0.25 * targetX;
-  const labelY = 0.25 * sourceY + 0.5 * my + 0.25 * targetY;
 
   const markerId = `arrow-${d.relationId}`;
 
@@ -119,11 +139,14 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
         id={id}
         path={path}
         style={{
-          stroke: isDimmed ? '#1f3050' : vs.color,
-          strokeWidth: vs.strokeWidth,
+          // Dimmed edges keep their type colour but at low opacity, so the
+          // user can still read the project's overall shape while focusing
+          // on one selection.
+          stroke: isDimmed ? vs.color : vs.color,
+          strokeWidth: isDimmed ? Math.max(vs.strokeWidth - 0.6, 1) : vs.strokeWidth,
           strokeDasharray: strokeDashArray,
           strokeLinecap: 'round',
-          opacity: isDimmed ? 0.18 : vs.opacity,
+          opacity: isDimmed ? 0.35 : vs.opacity,
           fill: 'none',
           animation: d.animated && !isDimmed
             ? `arch-edge-flow ${isSelected ? 1.4 : 2.2}s linear infinite`

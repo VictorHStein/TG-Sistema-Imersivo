@@ -62,7 +62,8 @@
 
     { "id": "ver_image_test", "name": "Teste funcional de imagem",   "category": "verification", "step": 10, "description": "Teste funcional do payload em câmara para verificar aquisição da imagem.",                "status": "planned",     "metadata": { "method": "Test",     "level": "Subsystem" } },
     { "id": "ver_downlink",   "name": "Teste de downlink",           "category": "verification", "step": 10, "description": "Teste end-to-end de downlink S-Band com a estação solo.",                                  "status": "in_progress", "metadata": { "method": "Test",     "level": "System" } },
-    { "id": "ver_thermal",    "name": "Análise térmica",             "category": "verification", "step": 10, "description": "Análise térmica em pior caso (eclipse longo / iluminação máxima) para validar a faixa.", "status": "passed",      "metadata": { "method": "Analysis", "level": "Subsystem" } }
+    { "id": "ver_thermal",    "name": "Análise térmica",             "category": "verification", "step": 10, "description": "Análise térmica em pior caso (eclipse longo / iluminação máxima) para validar a faixa.", "status": "passed",      "metadata": { "method": "Analysis", "level": "Subsystem" } },
+    { "id": "ver_power",      "name": "Teste em vácuo térmico (EPS)","category": "verification", "step": 10, "description": "Teste de capacidade da bateria em ciclos eclipse/sol com cargas representativas.",         "status": "planned",     "metadata": { "method": "Test",     "level": "Subsystem" } }
   ],
   "relations": [
     { "id": "rel_capture_req",      "type": "allocated_to",             "source": "req_image",    "target": "func_capture", "label": "REQ-001 → função capturar",          "step": 4 },
@@ -97,10 +98,17 @@
     { "id": "rel_obc_str_mech",    "type": "mechanically_attached_to", "source": "obc",          "target": "structure",    "label": "Fixação no deck central",             "step": 8 },
     { "id": "rel_ttc_str_mech",    "type": "mechanically_attached_to", "source": "ttc",          "target": "structure",    "label": "Fixação no deck inferior",            "step": 8 },
     { "id": "rel_adcs_str_mech",   "type": "mechanically_attached_to", "source": "adcs",         "target": "structure",    "label": "Fixação no deck inferior",            "step": 8 },
+    { "id": "rel_th_str_mech",     "type": "mechanically_attached_to", "source": "thermal",      "target": "structure",    "label": "Radiadores e MLI fixados",            "step": 8 },
+    { "id": "rel_ant_ttc_mech",    "type": "mechanically_attached_to", "source": "antenna",      "target": "ttc",          "label": "Antena montada no transceptor",       "step": 8 },
+    { "id": "rel_rw_adcs_mech",    "type": "mechanically_attached_to", "source": "rw_set",       "target": "adcs",         "label": "Reaction wheels no bloco ADCS",       "step": 8 },
 
     { "id": "rel_pl_thermal",      "type": "thermally_coupled_to",     "source": "payload",      "target": "thermal",      "label": "Caminho térmico do detector",         "step": 8, "criticality": "medium" },
     { "id": "rel_obc_thermal",     "type": "thermally_coupled_to",     "source": "obc",          "target": "thermal",      "label": "Caminho térmico do OBC",              "step": 8 },
     { "id": "rel_eps_thermal_t",   "type": "thermally_coupled_to",     "source": "battery",      "target": "thermal",      "label": "Heater dedicado da bateria",          "step": 8, "criticality": "high" },
+
+    { "id": "rel_solar_battery",   "type": "provides_power_to",        "source": "solar_array",  "target": "battery",      "label": "Carga da bateria via SAR",            "step": 8, "criticality": "high" },
+    { "id": "rel_battery_pcdu",    "type": "provides_power_to",        "source": "battery",      "target": "pcdu",         "label": "Barra primária 28 V",                 "step": 8, "criticality": "high" },
+    { "id": "rel_camera_obc_data", "type": "sends_data_to",            "source": "camera",       "target": "obc",          "label": "Pixels brutos do sensor",             "step": 8, "criticality": "high" },
 
     { "id": "rel_pl_satisfies",    "type": "satisfies",                "source": "payload",      "target": "req_image",    "label": "Payload satisfaz REQ-001",            "step": 9 },
     { "id": "rel_ttc_satisfies",   "type": "satisfies",                "source": "ttc",          "target": "req_downlink", "label": "TT&C satisfaz REQ-002",               "step": 9 },
@@ -109,6 +117,7 @@
 
     { "id": "rel_ver_image",       "type": "verifies",                 "source": "ver_image_test","target": "req_image",   "label": "Verifica REQ-001",                    "step": 10 },
     { "id": "rel_ver_downlink",    "type": "verifies",                 "source": "ver_downlink", "target": "req_downlink", "label": "Verifica REQ-002",                    "step": 10 },
+    { "id": "rel_ver_power_r",     "type": "verifies",                 "source": "ver_power",    "target": "req_power",    "label": "Verifica REQ-003",                    "step": 10 },
     { "id": "rel_ver_thermal",     "type": "verifies",                 "source": "ver_thermal",  "target": "req_thermal",  "label": "Verifica REQ-004",                    "step": 10 }
   ],
   "budgets": [
