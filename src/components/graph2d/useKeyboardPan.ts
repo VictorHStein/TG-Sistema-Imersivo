@@ -32,6 +32,13 @@ import { computeVisibleEntities } from '../../state/architectureStore';
  *     newViewport = oldViewport + worldAnchor × (oldZoom − newZoom)
  */
 const PAN_BASE = 10;
+/**
+ * Cap on world-units-per-frame pan, so that at low zoom (where 1/zoom
+ * blows up) the camera doesn't fly across the canvas in one keystroke.
+ * High zoom keeps the natural 1/zoom screen-constant feel; low zoom
+ * is throttled.
+ */
+const PAN_CAP = 6;
 const ZOOM_STEP = 0.02;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2.5;
@@ -79,7 +86,11 @@ export function useKeyboardPan(active: boolean = true): void {
     const loop = () => {
       const v = getViewport();
       const sprint = keys.current.shift ? 3 : 1;
-      const panSpeed = (PAN_BASE / v.zoom) * sprint;
+      // 1/zoom keeps screen-pixels-per-frame constant, but at low zoom
+      // (fit-view ~0.5) that means 20 world units per frame — way too
+      // much. Cap it so low-zoom navigation feels deliberate while
+      // high-zoom keeps the same touch.
+      const panSpeed = Math.min(PAN_BASE / v.zoom, PAN_CAP) * sprint;
 
       let dx = 0, dy = 0;
       if (keys.current.w) dy += panSpeed;
