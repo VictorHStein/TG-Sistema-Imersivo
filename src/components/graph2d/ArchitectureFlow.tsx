@@ -15,6 +15,8 @@ import { ArchitectureNode, type ArchitectureNodeData } from './ArchitectureNode'
 import { ArchitectureEdge, type ArchitectureEdgeData } from './ArchitectureEdge';
 import { RowBackground } from './RowBackground';
 import { SmartMinimap } from './SmartMinimap';
+import { useKeyboardPan } from './useKeyboardPan';
+import { NavHint } from '../layout/NavHint';
 import { useFlowLayout, NODE_WIDTH, NODE_HEIGHT } from './useFlowLayout';
 import { getRelationVisualStyle } from '../../domain/parser/relationStyle';
 import {
@@ -196,6 +198,7 @@ function FitOnSelection({
 }
 
 function FlowCanvas() {
+  useKeyboardPan();
   const architecture = useArchitectureStore((s) => s.architecture);
   const selectedEntityId = useArchitectureStore((s) => s.selectedEntityId);
   const selectedRelationId = useArchitectureStore((s) => s.selectedRelationId);
@@ -485,6 +488,7 @@ function FlowCanvas() {
           <Controls showInteractive={false} />
         </ReactFlow>
         {minimapOpen && <SmartMinimap />}
+        <NavHint mode="2d" />
       </div>
     </div>
   );

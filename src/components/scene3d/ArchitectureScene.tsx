@@ -14,6 +14,8 @@ import { RelationTube } from './RelationTube';
 import { SceneMiniMap } from './SceneMiniMap';
 import { use3DLayout, type ThreeDPosition } from './use3DLayout';
 import { getRelationVisualStyle } from '../../domain/parser/relationStyle';
+import { WASDFlyCam } from './WASDFlyCam';
+import { NavHint } from '../layout/NavHint';
 
 function CameraControls({
   controlsRef,
@@ -177,6 +179,7 @@ function SceneContent({
 
       <CameraResetWatcher tick={cameraResetTick} controlsRef={controlsRef} />
       <CameraFocus target={focusTarget} tick={cameraFocusOnSelectedTick} controlsRef={controlsRef} />
+      <WASDFlyCam controlsRef={controlsRef} />
 
       {/* Entity meshes */}
       {visibleEntities.map((entity) => {
@@ -320,6 +323,7 @@ export function ArchitectureScene() {
       </div>
 
       <SceneMiniMap />
+      <NavHint mode="3d" />
     </div>
   );
 }
