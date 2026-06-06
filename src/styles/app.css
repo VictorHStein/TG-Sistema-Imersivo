@@ -49,13 +49,12 @@
   }
 }
 
-/* ── Nav hint (WASD chip in the bottom-left of the canvas) ── */
+/* ── Nav hint (Atalhos pill in canvas bottom-left) ── */
 .nav-hint {
   position: absolute;
   bottom: 14px;
   left: 14px;
   z-index: 20;
-  padding: 8px 10px 6px;
   background: rgba(8, 16, 32, 0.92);
   border: 1px solid var(--border-default);
   border-radius: 8px;
@@ -64,7 +63,24 @@
   font-size: 10.5px;
   color: var(--text-secondary);
   backdrop-filter: blur(8px);
+  padding: 8px 10px 6px;
 }
+
+/* Compact pill state */
+.nav-hint--chip {
+  padding: 4px 10px;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all var(--transition-fast);
+}
+.nav-hint--chip:hover {
+  color: var(--text-accent);
+  border-color: var(--text-accent);
+  background: rgba(8, 16, 32, 0.98);
+}
+
 .nav-hint__row {
   display: flex;
   align-items: center;
@@ -72,9 +88,25 @@
   gap: 6px;
   margin-bottom: 4px;
 }
+.nav-hint__line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 3px 0;
+  font-size: 10.5px;
+}
+.nav-hint__line--mouse {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 10px;
+}
 .nav-hint__sub {
-  margin-top: 4px;
-  margin-bottom: 0;
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border-subtle);
   font-size: 9.5px;
   color: var(--text-muted);
 }
@@ -94,14 +126,9 @@
   height: 18px;
   border-radius: 4px;
   line-height: 1;
+  cursor: pointer;
 }
 .nav-hint__close:hover { color: var(--text-primary); background: rgba(56,189,248,0.1); }
-.nav-hint__keys {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 6px;
-}
 .nav-hint__sep {
   color: var(--text-muted);
   font-size: 10px;

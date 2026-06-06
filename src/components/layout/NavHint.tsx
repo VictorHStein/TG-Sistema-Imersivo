@@ -1,44 +1,68 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 /**
- * Tiny floating chip in the bottom-left corner of the canvas reminding
- * the user that WASD works. Dismissable; remembers the dismissal in
- * localStorage so it shows up exactly once per browser.
+ * Compact "Atalhos" pill that lives in the canvas bottom-left. Tap to
+ * expand a card with the full keyboard map. Collapsed by default so it
+ * doesn't intrude on the canvas.
  */
-const KEY = 'tg-nav-hint-dismissed-v1';
-
 export function NavHint({ mode }: { mode: '2d' | '3d' }) {
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem(KEY)) setOpen(true);
-    } catch { /* localStorage disabled */ }
-  }, []);
-
-  const dismiss = () => {
-    setOpen(false);
-    try { localStorage.setItem(KEY, '1'); } catch { /* ignore */ }
-  };
-
-  if (!open) return null;
+  if (!open) {
+    return (
+      <button
+        className="nav-hint nav-hint--chip"
+        onClick={() => setOpen(true)}
+        title="Mostrar atalhos de teclado"
+      >
+        ⌨ Atalhos
+      </button>
+    );
+  }
 
   return (
     <div className="nav-hint" role="status">
       <div className="nav-hint__row">
-        <span className="nav-hint__title">Navegação por teclado</span>
-        <button className="nav-hint__close" onClick={dismiss} aria-label="Fechar dica">×</button>
+        <span className="nav-hint__title">Atalhos de teclado</span>
+        <button className="nav-hint__close" onClick={() => setOpen(false)} aria-label="Fechar">×</button>
       </div>
-      <div className="nav-hint__keys">
-        <Kbd>W</Kbd> <Kbd>A</Kbd> <Kbd>S</Kbd> <Kbd>D</Kbd>
-        <span className="nav-hint__sep">{mode === '3d' ? 'mover (XZ)' : 'pan'}</span>
-        <Kbd>Q</Kbd> <Kbd>E</Kbd>
-        <span className="nav-hint__sep">{mode === '3d' ? 'descer / subir' : 'zoom −/+'}</span>
-        <Kbd>Shift</Kbd>
-        <span className="nav-hint__sep">acelerar</span>
-      </div>
-      <div className="nav-hint__row nav-hint__sub">
-        <Kbd>Ctrl</Kbd> + <Kbd>K</Kbd> busca · <Kbd>Esc</Kbd> limpa
+      {mode === '3d' ? (
+        <>
+          <div className="nav-hint__line">
+            <Kbd>W</Kbd> <Kbd>A</Kbd> <Kbd>S</Kbd> <Kbd>D</Kbd>
+            <span className="nav-hint__sep">mover no plano</span>
+          </div>
+          <div className="nav-hint__line">
+            <Kbd>Q</Kbd> <Kbd>E</Kbd>
+            <span className="nav-hint__sep">descer / subir</span>
+          </div>
+          <div className="nav-hint__line">
+            <Kbd>Shift</Kbd>
+            <span className="nav-hint__sep">3× mais rápido</span>
+          </div>
+          <div className="nav-hint__line nav-hint__line--mouse">
+            Mouse: arrasto = girar · scroll = zoom · arrasto direito = pan
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="nav-hint__line">
+            <Kbd>Q</Kbd> / <Kbd>−</Kbd>
+            <span className="nav-hint__sep">zoom out</span>
+            <Kbd>E</Kbd> / <Kbd>+</Kbd>
+            <span className="nav-hint__sep">zoom in</span>
+          </div>
+          <div className="nav-hint__line">
+            <Kbd>Shift</Kbd>
+            <span className="nav-hint__sep">3× mais rápido</span>
+          </div>
+          <div className="nav-hint__line nav-hint__line--mouse">
+            Mouse: arrasto = pan · scroll = zoom
+          </div>
+        </>
+      )}
+      <div className="nav-hint__line nav-hint__sub">
+        <Kbd>Ctrl</Kbd> + <Kbd>K</Kbd> busca · <Kbd>Esc</Kbd> limpa seleção
       </div>
     </div>
   );

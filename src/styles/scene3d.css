@@ -38,6 +38,13 @@
   opacity: 0.55;
 }
 .hud-btn:disabled:hover { color: var(--text-muted); border-color: var(--border-subtle); }
+.hud-btn.is-on {
+  background: var(--text-accent);
+  color: #02050f;
+  border-color: var(--text-accent);
+  font-weight: 600;
+}
+.hud-btn.is-on:hover { background: #5ec8fb; color: #02050f; }
 .hud-divider {
   width: 1px;
   height: 18px;

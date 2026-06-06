@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useRef, useCallback, useEffect } from 'react';
+import { Suspense, useMemo, useRef, useCallback, useEffect, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -19,8 +19,10 @@ import { NavHint } from '../layout/NavHint';
 
 function CameraControls({
   controlsRef,
+  autoRotate,
 }: {
   controlsRef: React.MutableRefObject<OrbitControlsImpl | null>;
+  autoRotate: boolean;
 }) {
   // Bind ref via useEffect on mount of OrbitControls
   return (
@@ -31,6 +33,8 @@ function CameraControls({
       enablePan
       enableZoom
       enableRotate
+      autoRotate={autoRotate}
+      autoRotateSpeed={1.6}
       minDistance={6}
       maxDistance={90}
       target={[0, 0, 0]}
@@ -43,25 +47,41 @@ const DEFAULT_CAMERA_POS: [number, number, number] = [22, 17, 22];
 const DEFAULT_CAMERA_TARGET: [number, number, number] = [0, 0, 0];
 
 /**
- * Moves the camera toward `target` ONLY when `tick` changes — i.e. when
- * the user explicitly asks for a focus via the HUD button.
+ * Moves the camera toward `target` on two triggers:
+ *   1. The selected entity's id changes (auto-focus on click) — the
+ *      classic "click → camera flies to it" feel.
+ *   2. The HUD's `focusTick` is bumped (explicit re-focus button).
  *
- * Selection changes no longer move the camera. The user drives navigation
- * (pan / zoom / rotate) freely; clicking entities just selects them.
+ * In between, the user can fly freely with WASD or orbit with the mouse;
+ * the camera is only nudged on a real selection change. We capture the
+ * previous selection id and compare so re-selecting the same entity
+ * twice doesn't keep dragging the camera around.
  */
 function CameraFocus({
   target,
-  tick,
+  selectedId,
+  focusTick,
   controlsRef,
 }: {
   target: ThreeDPosition | null;
-  tick: number;
+  selectedId: string | null;
+  focusTick: number;
   controlsRef: React.MutableRefObject<OrbitControlsImpl | null>;
 }) {
   const { camera } = useThree();
+  const lastSelectionRef = useRef<string | null>(null);
+  const lastTickRef = useRef<number>(0);
+
   useEffect(() => {
-    if (tick === 0) return; // skip initial mount
-    if (!target) return;
+    const selectionChanged = selectedId !== lastSelectionRef.current;
+    const tickChanged = focusTick !== lastTickRef.current;
+    lastSelectionRef.current = selectedId;
+    lastTickRef.current = focusTick;
+
+    // Skip the initial mount (both ticks at 0, no prior selection)
+    if (!selectionChanged && !tickChanged) return;
+    if (!target || !selectedId) return;
+
     const t = new Vector3(target.x, target.y, target.z);
     const dist = camera.position.distanceTo(t);
     const dir = new Vector3().subVectors(camera.position, t).normalize();
@@ -71,8 +91,7 @@ function CameraFocus({
       controlsRef.current.target.copy(t);
       controlsRef.current.update();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick]);
+  }, [selectedId, focusTick, target, camera, controlsRef]);
   return null;
 }
 
@@ -178,7 +197,12 @@ function SceneContent({
       </mesh>
 
       <CameraResetWatcher tick={cameraResetTick} controlsRef={controlsRef} />
-      <CameraFocus target={focusTarget} tick={cameraFocusOnSelectedTick} controlsRef={controlsRef} />
+      <CameraFocus
+        target={focusTarget}
+        selectedId={selectedEntityId}
+        focusTick={cameraFocusOnSelectedTick}
+        controlsRef={controlsRef}
+      />
       <WASDFlyCam controlsRef={controlsRef} />
 
       {/* Entity meshes */}
@@ -265,6 +289,7 @@ export function ArchitectureScene() {
   const selectedEntityId = useArchitectureStore((s) => s.selectedEntityId);
   const requestCameraReset = useArchitectureStore((s) => s.requestCameraReset);
   const requestCameraFocusOnSelected = useArchitectureStore((s) => s.requestCameraFocusOnSelected);
+  const [autoRotate, setAutoRotate] = useState(false);
 
   // "Centralizar" now does a full reset — both position AND target snap back
   // to the default vantage point. Previously it only re-centred the target,
@@ -291,7 +316,7 @@ export function ArchitectureScene() {
         <Suspense fallback={null}>
           <SceneContent controlsRef={controlsRef} />
         </Suspense>
-        <CameraControls controlsRef={controlsRef} />
+        <CameraControls controlsRef={controlsRef} autoRotate={autoRotate} />
       </Canvas>
 
       {/* Camera HUD */}
@@ -306,6 +331,13 @@ export function ArchitectureScene() {
           title={selectedEntityId ? 'Mover câmera para o elemento selecionado' : 'Selecione algo primeiro'}
         >
           ◎ Focar selecionado
+        </button>
+        <button
+          className={`hud-btn${autoRotate ? ' is-on' : ''}`}
+          onClick={() => setAutoRotate((s) => !s)}
+          title="Girar a câmera em torno do alvo automaticamente"
+        >
+          {autoRotate ? '⏸ Parar giro' : '↻ Girar'}
         </button>
         <div className="hud-divider" />
         <div className="hud-label">Focar subsistema:</div>
