@@ -85,7 +85,13 @@ function CameraFocus({
     const t = new Vector3(target.x, target.y, target.z);
     const dist = camera.position.distanceTo(t);
     const dir = new Vector3().subVectors(camera.position, t).normalize();
-    const next = t.clone().add(dir.multiplyScalar(Math.min(Math.max(dist * 0.55, 7), 14)));
+    // Gentler approach: keep most of the distance the user already has,
+    // and never end up too close. Old factors 0.55 / [7, 14] were
+    // aggressive enough that the camera jammed right into the target.
+    // New: 0.85 of current distance, clamped [16, 36], so you always
+    // see the selected entity in context with its neighbours.
+    const tightness = Math.min(Math.max(dist * 0.85, 16), 36);
+    const next = t.clone().add(dir.multiplyScalar(tightness));
     camera.position.copy(next);
     if (controlsRef.current) {
       controlsRef.current.target.copy(t);

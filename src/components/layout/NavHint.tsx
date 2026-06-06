@@ -47,6 +47,10 @@ export function NavHint({ mode }: { mode: '2d' | '3d' }) {
       ) : (
         <>
           <div className="nav-hint__line">
+            <Kbd>W</Kbd> <Kbd>A</Kbd> <Kbd>S</Kbd> <Kbd>D</Kbd>
+            <span className="nav-hint__sep">pan</span>
+          </div>
+          <div className="nav-hint__line">
             <Kbd>Q</Kbd> / <Kbd>−</Kbd>
             <span className="nav-hint__sep">zoom out</span>
             <Kbd>E</Kbd> / <Kbd>+</Kbd>
@@ -57,7 +61,7 @@ export function NavHint({ mode }: { mode: '2d' | '3d' }) {
             <span className="nav-hint__sep">3× mais rápido</span>
           </div>
           <div className="nav-hint__line nav-hint__line--mouse">
-            Mouse: arrasto = pan · scroll = zoom
+            Mouse: arrasto = pan · scroll = zoom. Quando algo está selecionado, o zoom centraliza nele.
           </div>
         </>
       )}

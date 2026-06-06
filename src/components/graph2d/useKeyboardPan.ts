@@ -1,20 +1,33 @@
 import { useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
+import { useArchitectureStore } from '../../state/architectureStore';
+import { NODE_WIDTH, NODE_HEIGHT } from './useFlowLayout';
+import { computeFlowLayout } from './useFlowLayout';
+import { computeVisibleEntities } from '../../state/architectureStore';
 
 /**
- * Zoom-only keyboard control for the 2D React Flow viewport.
+ * Keyboard navigation for the 2D React Flow viewport.
  *
+ *   W / S → pan up / down
+ *   A / D → pan left / right
  *   Q / − → zoom out
  *   E / + → zoom in
- *   Shift  → 3× (sprint)
+ *   Shift  → 3× speed sprint
  *
- * In 2D the "up/down/forward/back" concepts don't apply (it's a flat
- * graph), so only zoom is mapped to the keyboard. Pan still works with
- * mouse drag.
+ * Pan
+ *   Speed scales with 1 / zoom so screen-space movement stays constant
+ *   regardless of zoom level.
  *
- * The zoom step is set to ~0.08 per frame — about 4× faster than the
- * old WASD pan version — so a tap of E quickly zooms into the detail.
+ * Zoom — anchors on selected entity when one exists
+ *   Default React-Flow zoom is around viewport (0,0). Here, if the user
+ *   has an entity selected, we ZOOM AROUND THAT ENTITY: as the zoom
+ *   changes, the selected entity stays under the same screen pixel.
+ *   That's what users expect — "zoom in on what I'm looking at".
+ *
+ *   Math: screenPos = worldPos × zoom + viewport. We want screenPos
+ *   constant, so newViewport = oldViewport + worldPos × (oldZoom − newZoom).
  */
+const PAN_BASE = 10;
 const ZOOM_STEP = 0.08;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2.5;
@@ -36,20 +49,23 @@ export function useKeyboardPan(active: boolean = true): void {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditable(e.target)) return;
       const k = e.key.toLowerCase();
-      // Q / - / _ zoom out; E / + / = zoom in
-      if (k === 'q' || e.key === '-' || e.key === '_') {
-        keys.current.out = true;
+      if (['w', 'a', 's', 'd'].includes(k)) {
+        keys.current[k] = true;
+        e.preventDefault();
+      } else if (k === 'q' || e.key === '-' || e.key === '_') {
+        keys.current.zoomOut = true;
         e.preventDefault();
       } else if (k === 'e' || e.key === '+' || e.key === '=') {
-        keys.current.in = true;
+        keys.current.zoomIn = true;
         e.preventDefault();
       }
       if (e.key === 'Shift') keys.current.shift = true;
     };
     const onKeyUp = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
-      if (k === 'q' || e.key === '-' || e.key === '_') keys.current.out = false;
-      if (k === 'e' || e.key === '+' || e.key === '=') keys.current.in = false;
+      if (['w', 'a', 's', 'd'].includes(k)) keys.current[k] = false;
+      if (k === 'q' || e.key === '-' || e.key === '_') keys.current.zoomOut = false;
+      if (k === 'e' || e.key === '+' || e.key === '=') keys.current.zoomIn = false;
       if (e.key === 'Shift') keys.current.shift = false;
     };
     window.addEventListener('keydown', onKeyDown);
@@ -58,14 +74,38 @@ export function useKeyboardPan(active: boolean = true): void {
     const loop = () => {
       const v = getViewport();
       const sprint = keys.current.shift ? 3 : 1;
+      const panSpeed = (PAN_BASE / v.zoom) * sprint;
+
+      let dx = 0, dy = 0;
+      if (keys.current.w) dy += panSpeed;
+      if (keys.current.s) dy -= panSpeed;
+      if (keys.current.a) dx += panSpeed;
+      if (keys.current.d) dx -= panSpeed;
 
       let dz = 0;
-      if (keys.current.out) dz -= ZOOM_STEP * sprint;
-      if (keys.current.in) dz += ZOOM_STEP * sprint;
+      if (keys.current.zoomOut) dz -= ZOOM_STEP * sprint;
+      if (keys.current.zoomIn) dz += ZOOM_STEP * sprint;
 
-      if (dz !== 0) {
-        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, v.zoom + dz));
-        if (newZoom !== v.zoom) setViewport({ x: v.x, y: v.y, zoom: newZoom });
+      if (dx !== 0 || dy !== 0 || dz !== 0) {
+        let newZoom = v.zoom;
+        let newX = v.x + dx;
+        let newY = v.y + dy;
+
+        if (dz !== 0) {
+          newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, v.zoom + dz));
+
+          // Anchor zoom on the selected entity if there is one
+          const anchor = getSelectedAnchor();
+          if (anchor) {
+            // Keep the anchor under the same screen pixel during zoom.
+            newX = newX + anchor.x * (v.zoom - newZoom);
+            newY = newY + anchor.y * (v.zoom - newZoom);
+          }
+        }
+
+        if (newX !== v.x || newY !== v.y || newZoom !== v.zoom) {
+          setViewport({ x: newX, y: newY, zoom: newZoom });
+        }
       }
       rafRef.current = requestAnimationFrame(loop);
     };
@@ -78,4 +118,27 @@ export function useKeyboardPan(active: boolean = true): void {
       keys.current = {};
     };
   }, [active, getViewport, setViewport]);
+}
+
+/**
+ * Returns the world-space centre point of whichever entity is currently
+ * selected — or null. Used by the zoom code so Q / E pivot around the
+ * thing the user is looking at instead of the viewport origin.
+ */
+function getSelectedAnchor(): { x: number; y: number } | null {
+  const s = useArchitectureStore.getState();
+  if (!s.selectedEntityId || !s.architecture) return null;
+  const visible = computeVisibleEntities(
+    s.architecture,
+    s.visibleCategories,
+    s.explorationMode,
+    s.currentStep,
+  );
+  const layout = computeFlowLayout(s.architecture, visible);
+  const pos = layout.positions.get(s.selectedEntityId);
+  if (!pos) return null;
+  return {
+    x: pos.x + NODE_WIDTH / 2,
+    y: pos.y + NODE_HEIGHT / 2,
+  };
 }
