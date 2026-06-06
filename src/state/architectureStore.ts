@@ -43,6 +43,13 @@ interface ArchitectureState {
   sidePanelTab: SidePanelTab;
   legendOpen: boolean;
   minimapOpen: boolean;
+  /**
+   * Monotonic counter incremented whenever the 3D camera should snap back to
+   * its default framing (entering 3D, resetting the demo, manual recenter).
+   * The 3D scene watches this number — primitive equality, so a re-render is
+   * triggered exactly when the value changes.
+   */
+  cameraResetTick: number;
 
   /* ── Actions ────────────────────────────────────────────────── */
   loadArchitectureFromJson: (raw: unknown, sourceName?: string) => { ok: boolean; issues: ValidationIssue[] };
@@ -64,6 +71,7 @@ interface ArchitectureState {
   toggleMinimap: () => void;
   toggleCrossCategoryOnly: () => void;
   toggleCriticalOnly: () => void;
+  requestCameraReset: () => void;
 }
 
 function loadDemo() {
@@ -101,6 +109,7 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
   sidePanelTab: 'overview',
   legendOpen: true,
   minimapOpen: false,
+  cameraResetTick: 0,
 
   loadArchitectureFromJson: (raw, sourceName) => {
     const result = validateArchitecture(raw);
@@ -109,7 +118,7 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
       return { ok: false, issues: result.issues };
     }
     const normalized = normalizeArchitecture(result.data);
-    set({
+    set((s) => ({
       architecture: normalized,
       lastIssues: [],
       jsonSourceName: sourceName ?? null,
@@ -122,13 +131,14 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
       focusedSubsystemId: null,
       showOnlyCrossCategory: false,
       emphasizeOnlyCritical: false,
-    });
+      cameraResetTick: s.cameraResetTick + 1,
+    }));
     return { ok: true, issues: [] };
   },
 
   resetToDemo: () => {
     const normalized = loadDemo();
-    set({
+    set((s) => ({
       architecture: normalized,
       lastIssues: [],
       jsonSourceName: 'demoArchitecture.json',
@@ -141,7 +151,8 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
       focusedSubsystemId: null,
       showOnlyCrossCategory: false,
       emphasizeOnlyCritical: false,
-    });
+      cameraResetTick: s.cameraResetTick + 1,
+    }));
   },
 
   selectEntity: (id) => set({ selectedEntityId: id, selectedRelationId: null, sidePanelTab: id ? 'details' : 'overview' }),
@@ -181,7 +192,12 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
       return { visibleCategories: next };
     }),
 
-  setViewMode: (mode) => set({ viewMode: mode }),
+  setViewMode: (mode) => set((s) => ({
+    viewMode: mode,
+    // Re-frame the 3D camera every time the user lands on the 3D scene,
+    // so they always start from a known good vantage point.
+    cameraResetTick: mode === '3d' ? s.cameraResetTick + 1 : s.cameraResetTick,
+  })),
   setExplorationMode: (mode) => set({ explorationMode: mode }),
   focusSubsystem: (id) => set({ focusedSubsystemId: id }),
   clearFocus: () => set({ focusedSubsystemId: null }),
@@ -190,6 +206,7 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
   toggleMinimap: () => set((s) => ({ minimapOpen: !s.minimapOpen })),
   toggleCrossCategoryOnly: () => set((s) => ({ showOnlyCrossCategory: !s.showOnlyCrossCategory })),
   toggleCriticalOnly: () => set((s) => ({ emphasizeOnlyCritical: !s.emphasizeOnlyCritical })),
+  requestCameraReset: () => set((s) => ({ cameraResetTick: s.cameraResetTick + 1 })),
 }));
 
 /* ── Helpers ──────────────────────────────────────────────────

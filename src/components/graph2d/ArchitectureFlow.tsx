@@ -5,17 +5,16 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   useReactFlow,
   type Node,
   type Edge,
-  type MiniMapNodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { ArchitectureNode, type ArchitectureNodeData } from './ArchitectureNode';
 import { ArchitectureEdge, type ArchitectureEdgeData } from './ArchitectureEdge';
 import { RowBackground } from './RowBackground';
+import { SmartMinimap } from './SmartMinimap';
 import { useFlowLayout, NODE_WIDTH, NODE_HEIGHT } from './useFlowLayout';
 import { getRelationVisualStyle } from '../../domain/parser/relationStyle';
 import {
@@ -26,22 +25,6 @@ import {
 
 const NODE_TYPES = { entity: ArchitectureNode, rowbg: RowBackground } as const;
 const EDGE_TYPES = { architecture: ArchitectureEdge } as const;
-
-/**
- * Custom minimap node renderer:
- *  - Row backgrounds are hidden (they would dwarf entity dots otherwise).
- *  - Entity dots are drawn larger so they're visible at small minimap sizes.
- */
-function MiniMapEntityNode({ x, y, width, height, color, id }: MiniMapNodeProps) {
-  if (typeof id === 'string' && id.startsWith('row-')) return null;
-  // Inflate small nodes so they read on the minimap
-  const cx = x + width / 2;
-  const cy = y + height / 2;
-  const r = Math.max(width, height) * 0.7;
-  return (
-    <circle cx={cx} cy={cy} r={r} fill={color} stroke="rgba(2,6,16,0.6)" strokeWidth={4} />
-  );
-}
 
 function FitOnChange({ depend, entityIds }: { depend: unknown[]; entityIds: string[] }) {
   const { fitView } = useReactFlow();
@@ -89,7 +72,14 @@ function FlowCanvas() {
 
   const layout = useFlowLayout(architecture, visibleEntities, visibleRelations);
 
-  // Compute focus neighbors so we can dim non-related nodes/edges
+  // Compute focus neighbors so we can dim non-related nodes/edges.
+  //
+  //   - Selection (click on a node)  → only that node + endpoints of its
+  //     declared relations. Children-via-parentId are NOT auto-included; the
+  //     user explicitly asked for "só ela deve ficar marcada, mostrando os
+  //     relacionamentos dela com outras partes".
+  //   - Focus  (HUD "Focar este elemento" button) → adds parentId children
+  //     so you can isolate a subsystem with its components.
   const focusedNeighbors = useMemo(() => {
     if (!architecture || (!selectedEntityId && !focusedSubsystemId)) return null;
     const focusId = selectedEntityId ?? focusedSubsystemId!;
@@ -99,9 +89,12 @@ function FlowCanvas() {
       if (r.source === focusId) { set.add(r.target); relSet.add(r.id); }
       if (r.target === focusId) { set.add(r.source); relSet.add(r.id); }
     }
-    // Also add components belonging to the focused subsystem
-    for (const e of architecture.entities) {
-      if (e.parentId === focusId) set.add(e.id);
+    // Only include children-via-parentId when the user explicitly focused
+    // (not on simple click-selection).
+    if (focusedSubsystemId === focusId) {
+      for (const e of architecture.entities) {
+        if (e.parentId === focusId) set.add(e.id);
+      }
     }
     return { entityIds: set, relationIds: relSet };
   }, [architecture, selectedEntityId, focusedSubsystemId]);
@@ -311,21 +304,8 @@ function FlowCanvas() {
           />
           <Background variant={BackgroundVariant.Dots} color="#1e3a5f55" gap={32} size={1.2} />
           <Controls showInteractive={false} />
-          {minimapOpen && (
-            <MiniMap
-              zoomable
-              pannable
-              nodeComponent={MiniMapEntityNode}
-              nodeColor={(node) => {
-                if (node.type === 'rowbg') return 'transparent';
-                const d = node.data as ArchitectureNodeData | undefined;
-                return d?.category?.color ?? '#475569';
-              }}
-              nodeStrokeWidth={0}
-              maskColor="rgba(2,6,23,0.85)"
-            />
-          )}
         </ReactFlow>
+        {minimapOpen && <SmartMinimap />}
       </div>
     </div>
   );

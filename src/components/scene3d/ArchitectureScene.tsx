@@ -37,6 +37,9 @@ function CameraControls({
   );
 }
 
+const DEFAULT_CAMERA_POS: [number, number, number] = [22, 17, 22];
+const DEFAULT_CAMERA_TARGET: [number, number, number] = [0, 0, 0];
+
 function CameraFocus({
   target,
   controlsRef,
@@ -60,6 +63,29 @@ function CameraFocus({
   return null;
 }
 
+/**
+ * Snaps the camera back to its default position/target whenever the
+ * `tick` value changes (incremented by the store on reset-to-demo,
+ * load-from-json, or entering 3D view).
+ */
+function CameraResetWatcher({
+  tick,
+  controlsRef,
+}: {
+  tick: number;
+  controlsRef: React.MutableRefObject<OrbitControlsImpl | null>;
+}) {
+  const { camera } = useThree();
+  useEffect(() => {
+    camera.position.set(...DEFAULT_CAMERA_POS);
+    if (controlsRef.current) {
+      controlsRef.current.target.set(...DEFAULT_CAMERA_TARGET);
+      controlsRef.current.update();
+    }
+  }, [tick, camera, controlsRef]);
+  return null;
+}
+
 function SceneContent({
   controlsRef,
 }: {
@@ -77,6 +103,7 @@ function SceneContent({
   const explorationMode = useArchitectureStore((s) => s.explorationMode);
   const currentStep = useArchitectureStore((s) => s.currentStep);
   const showOnlyCrossCategory = useArchitectureStore((s) => s.showOnlyCrossCategory);
+  const cameraResetTick = useArchitectureStore((s) => s.cameraResetTick);
 
   const visibleEntities = useMemo(
     () => computeVisibleEntities(architecture, visibleCategories, explorationMode, currentStep),
@@ -136,6 +163,7 @@ function SceneContent({
         <meshBasicMaterial color="#38bdf8" opacity={0.18} transparent />
       </mesh>
 
+      <CameraResetWatcher tick={cameraResetTick} controlsRef={controlsRef} />
       <CameraFocus target={focusTarget} controlsRef={controlsRef} />
 
       {/* Entity meshes */}
@@ -218,13 +246,16 @@ export function ArchitectureScene() {
   const selectEntity = useArchitectureStore((s) => s.selectEntity);
   const focusSubsystem = useArchitectureStore((s) => s.focusSubsystem);
   const focusedId = useArchitectureStore((s) => s.focusedSubsystemId);
+  const requestCameraReset = useArchitectureStore((s) => s.requestCameraReset);
 
+  // "Centralizar" now does a full reset — both position AND target snap back
+  // to the default vantage point. Previously it only re-centred the target,
+  // which meant the user could still end up upside-down after panning.
   const recenter = useCallback(() => {
-    if (controlsRef.current) {
-      controlsRef.current.target.set(0, 0, 0);
-      controlsRef.current.update();
-    }
-  }, []);
+    selectEntity(null);
+    focusSubsystem(null);
+    requestCameraReset();
+  }, [selectEntity, focusSubsystem, requestCameraReset]);
 
   const subsystems = useMemo(
     () => architecture?.entities.filter((e) => e.category === 'subsystem') ?? [],
@@ -247,8 +278,8 @@ export function ArchitectureScene() {
 
       {/* Camera HUD */}
       <div className="scene3d-hud">
-        <button className="hud-btn" onClick={() => { selectEntity(null); focusSubsystem(null); recenter(); }}>
-          Centralizar
+        <button className="hud-btn" onClick={recenter} title="Voltar à vista padrão">
+          ⟲ Centralizar
         </button>
         <div className="hud-divider" />
         <div className="hud-label">Focar subsistema:</div>

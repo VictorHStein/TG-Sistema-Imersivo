@@ -60,9 +60,9 @@
     { "id": "antenna",      "name": "Antena S-Band",                 "category": "component",    "parentId": "ttc",     "subsystem": "TTC",       "step": 7, "description": "Antena patch dual-polarização para uplink e downlink." },
     { "id": "rw_set",       "name": "Reaction wheels (3)",           "category": "component",    "parentId": "adcs",    "subsystem": "ADCS",      "step": 7, "description": "Conjunto de 3 reaction wheels para controle 3-eixos." },
 
-    { "id": "ver_image_test", "name": "Teste funcional de imagem",   "category": "verification", "step": 10, "description": "Teste funcional do payload em câmara para verificar aquisição da imagem.", "status": "planned" },
-    { "id": "ver_downlink",   "name": "Teste de downlink",           "category": "verification", "step": 10, "description": "Teste de end-to-end downlink S-Band com estação solo.",                       "status": "in_progress" },
-    { "id": "ver_thermal",    "name": "Análise térmica",             "category": "verification", "step": 10, "description": "Análise térmica em pior caso para validar faixa operacional.",               "status": "passed" }
+    { "id": "ver_image_test", "name": "Teste funcional de imagem",   "category": "verification", "step": 10, "description": "Teste funcional do payload em câmara para verificar aquisição da imagem.",                "status": "planned",     "metadata": { "method": "Test",     "level": "Subsystem" } },
+    { "id": "ver_downlink",   "name": "Teste de downlink",           "category": "verification", "step": 10, "description": "Teste end-to-end de downlink S-Band com a estação solo.",                                  "status": "in_progress", "metadata": { "method": "Test",     "level": "System" } },
+    { "id": "ver_thermal",    "name": "Análise térmica",             "category": "verification", "step": 10, "description": "Análise térmica em pior caso (eclipse longo / iluminação máxima) para validar a faixa.", "status": "passed",      "metadata": { "method": "Analysis", "level": "Subsystem" } }
   ],
   "relations": [
     { "id": "rel_capture_req",      "type": "allocated_to",             "source": "req_image",    "target": "func_capture", "label": "REQ-001 → função capturar",          "step": 4 },
@@ -138,11 +138,6 @@
         { "entityId": "thermal",   "value": 6 }
       ]
     }
-  ],
-  "verifications": [
-    { "id": "ver_image_test", "requirementId": "req_image",    "method": "Test",     "level": "Subsystem", "status": "planned",     "description": "Executar teste funcional do payload para demonstrar aquisição de imagem." },
-    { "id": "ver_downlink",   "requirementId": "req_downlink", "method": "Test",     "level": "System",    "status": "in_progress", "description": "Validar enlace S-Band fim-a-fim com a estação solo." },
-    { "id": "ver_thermal",    "requirementId": "req_thermal",  "method": "Analysis", "level": "Subsystem", "status": "passed",      "description": "Análise térmica em pior caso (eclipse longo / iluminação máxima)." }
   ],
   "risks": [
     { "id": "risk_payload_thermal", "title": "Detector do payload fora da faixa térmica durante eclipse longo", "probability": 3, "impact": 4, "mitigation": "Adicionar heater dedicado e aumentar capacidade da bateria.",              "status": "open" },

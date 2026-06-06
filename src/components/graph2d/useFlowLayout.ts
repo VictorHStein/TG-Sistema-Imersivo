@@ -14,8 +14,11 @@ const ROW_GAP = 110;
  * Layered top-to-bottom layout: each category is a horizontal row.
  *
  * Within a row, entities are ordered by:
- *  1. parentId's X position (so children appear below/around the parent),
- *  2. id alphabetic order, for stable layout.
+ *  1. parentId's X position (so children appear directly under their parent),
+ *  2. declaration order in `architecture.entities` (= PBS code order).
+ *
+ * That means subsystems appear left-to-right as 1.1, 1.2, 1.3, …, and
+ * components appear directly below their parent in 1.X.1, 1.X.2 order.
  *
  * If an entity already has `position2D`, that wins.
  */
@@ -46,6 +49,11 @@ export function computeFlowLayout(
 
   const categoryOrder = architecture.categories.map((c) => c.id);
 
+  // Ordinal of each entity in the declared JSON list — same order the
+  // PBS codes use, so sorting by this matches 1.1, 1.2, 1.3 … visually.
+  const ordinal = new Map<string, number>();
+  architecture.entities.forEach((e, i) => ordinal.set(e.id, i));
+
   // Group entities by category
   const byCategory = new Map<string, ArchitectureEntity[]>();
   for (const e of visibleEntities) {
@@ -66,12 +74,13 @@ export function computeFlowLayout(
 
     const cat = architecture.categoriesById[catId];
 
-    // Sort: by parent X if any, else alphabetical
+    // Sort: by parent X (groups children under their parent), tie-break by
+    // declaration ordinal (which matches the PBS code numbering).
     const sorted = [...list].sort((a, b) => {
       const pa = a.parentId ? parentX.get(a.parentId) ?? Infinity : Infinity;
       const pb = b.parentId ? parentX.get(b.parentId) ?? Infinity : Infinity;
       if (pa !== pb) return pa - pb;
-      return a.id.localeCompare(b.id);
+      return (ordinal.get(a.id) ?? 0) - (ordinal.get(b.id) ?? 0);
     });
 
     const n = sorted.length;

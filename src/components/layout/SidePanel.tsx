@@ -184,9 +184,32 @@ function EntityDetails({
   const rel = architecture.relationsByEntity[entity.id] ?? { incoming: [], outgoing: [] };
   const parent = entity.parentId ? architecture.entitiesById[entity.parentId] : undefined;
   const children = architecture.entities.filter((e) => e.parentId === entity.id);
-  const verifications = (architecture.verifications ?? []).filter(
+
+  // Verifications linked to this entity: prefer the top-level `verifications`
+  // array (if the JSON author kept it), otherwise derive from `verifies`
+  // relations pointing at this entity (requirement → verifier).
+  const declaredVerifs = (architecture.verifications ?? []).filter(
     (v) => v.requirementId === entity.id,
   );
+  const derivedVerifs = declaredVerifs.length === 0
+    ? architecture.relations
+        .filter((r) => r.type === 'verifies' && r.target === entity.id)
+        .map((r) => {
+          const verEnt = architecture.entitiesById[r.source];
+          if (!verEnt) return null;
+          const meta = (verEnt.metadata ?? {}) as Record<string, string>;
+          return {
+            id: verEnt.id,
+            requirementId: entity.id,
+            method: (meta.method as 'Test' | 'Analysis' | 'Inspection' | 'Review of Design' | 'Demonstration') ?? 'Test',
+            level: meta.level,
+            status: (verEnt.status ?? 'planned') as 'planned' | 'in_progress' | 'passed' | 'failed' | 'verified' | 'waived',
+            description: verEnt.description,
+          };
+        })
+        .filter((v): v is NonNullable<typeof v> => v !== null)
+    : [];
+  const verifications = declaredVerifs.length > 0 ? declaredVerifs : derivedVerifs;
   const code = architecture.breakdownCodes[entity.id] ?? entity.id;
   const trace = architecture.traceById[entity.id];
 
