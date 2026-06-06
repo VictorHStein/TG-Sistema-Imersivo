@@ -26,6 +26,46 @@ import {
 const NODE_TYPES = { entity: ArchitectureNode, rowbg: RowBackground } as const;
 const EDGE_TYPES = { architecture: ArchitectureEdge } as const;
 
+type HandleId = 'top' | 'right' | 'bottom' | 'left';
+
+/**
+ * Pick the pair of (sourceHandle, targetHandle) that yields the most
+ * natural connection given where the two cards sit relative to each other.
+ *
+ *  • Same row (|Δy| < 12 px) → top–top (the edge will arc above the row).
+ *  • One row apart vertically  → bottom–top (or top–bottom going up).
+ *  • Far horizontal, same height → right–left (or left–right).
+ *
+ * The actual curve is drawn by ArchitectureEdge as a cubic bezier whose
+ * control points extend in the normal direction of each chosen side, so
+ * the line always leaves and enters perpendicular to the card edge.
+ */
+function pickHandles(
+  src: { x: number; y: number } | undefined,
+  tgt: { x: number; y: number } | undefined,
+): { source: HandleId; target: HandleId } {
+  if (!src || !tgt) return { source: 'bottom', target: 'top' };
+  const dx = tgt.x - src.x;
+  const dy = tgt.y - src.y;
+
+  // Intra-row: arc above the row
+  if (Math.abs(dy) < 12) {
+    return { source: 'top', target: 'top' };
+  }
+
+  // Different rows → vertical handles (most natural for hierarchy)
+  if (Math.abs(dy) > 80) {
+    return dy > 0
+      ? { source: 'bottom', target: 'top' }
+      : { source: 'top', target: 'bottom' };
+  }
+
+  // Slight vertical offset but mostly horizontal → side handles
+  return dx > 0
+    ? { source: 'right', target: 'left' }
+    : { source: 'left', target: 'right' };
+}
+
 function FitOnChange({ depend, entityIds }: { depend: unknown[]; entityIds: string[] }) {
   const { fitView } = useReactFlow();
   useEffect(() => {
@@ -208,6 +248,12 @@ function FlowCanvas() {
          relation.type === 'sends_data_to' ||
          relation.type === 'receives_command_from');
 
+      // Pick the closest pair of sides on (source, target). The picker
+      // returns the Handle ids we registered on ArchitectureNode.
+      const srcPos = layout.positions.get(relation.source);
+      const tgtPos = layout.positions.get(relation.target);
+      const handles = pickHandles(srcPos, tgtPos);
+
       const data: ArchitectureEdgeData = {
         relationId: relation.id,
         style: vs,
@@ -227,6 +273,8 @@ function FlowCanvas() {
         id: relation.id,
         source: relation.source,
         target: relation.target,
+        sourceHandle: handles.source,
+        targetHandle: handles.target,
         type: 'architecture',
         data: data as unknown as Record<string, unknown>,
         zIndex: isSelected ? 30 : isDimmed ? 1 : 5,

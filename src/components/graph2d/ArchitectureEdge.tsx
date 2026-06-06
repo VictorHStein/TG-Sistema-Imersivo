@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { BaseEdge, EdgeLabelRenderer, type EdgeProps } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, Position, type EdgeProps } from '@xyflow/react';
 import { RelationBadge } from './RelationBadge';
 import type { RelationVisualStyle } from '../../domain/parser/relationStyle';
 
@@ -21,76 +21,54 @@ export interface ArchitectureEdgeData extends Record<string, unknown> {
 }
 
 /**
- * Edge with two routing strategies, depending on geometry:
+ * Cubic-bezier edge that leaves and enters each card PERPENDICULAR to the
+ * chosen handle side.
  *
- *   • Intra-row  (sourceY ≈ targetY)  — typical for subsystem↔subsystem
- *     interfaces. The edge arcs HIGH above the row so it never crosses
- *     intermediate cards. Parallel edges fan out vertically.
+ *   source side normal     target side normal
+ *           ↓                     ↑
+ *      ╭────────────╮         ╭────────────╮
+ *      │   source   │   ↘ ↗   │   target   │
+ *      ╰────────────╯         ╰────────────╯
  *
- *   • Cross-row  — quadratic bezier with a perpendicular control offset
- *     so parallel edges don't overlap.
+ * The control points extend out along those normals so the curve looks
+ * like it grew out of the card naturally instead of grazing its corner.
+ * Extension length is proportional to the source→target distance, so
+ * long edges curve gently and short edges turn quickly.
  *
- * The numeric badge sits at the curve's midpoint. The text relation-type
- * label is NOT rendered on the edge anymore — the colour + numbered badge
- * already encode the type, and stacking a text pill on every selected edge
- * (when one entity has 6+ relations) produces visual noise.
+ * Parallel edges between the same pair are offset perpendicular to the
+ * source→target line so they fan out instead of stacking.
  */
 function ArchitectureEdgeImpl(props: EdgeProps) {
-  const { id, sourceX, sourceY, targetX, targetY, data } = props;
+  const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data } = props;
   const d = data as ArchitectureEdgeData;
   const { style: vs, isSelected, isDimmed, isEmphasized, relationIndex } = d;
 
   const dx = targetX - sourceX;
   const dy = targetY - sourceY;
-  const isIntraRow = Math.abs(dy) < 12;
+  const distance = Math.sqrt(dx * dx + dy * dy) || 1;
 
-  let path: string;
-  let labelX: number;
-  let labelY: number;
+  // Extension is the length of each control-point "arm". Longer edges →
+  // longer arms → softer curve.
+  const extension = Math.max(50, Math.min(distance * 0.42, 200));
 
-  if (isIntraRow) {
-    // Strong upward bezier arc above the row so edges between subsystems
-    // don't cross intermediate cards. Parallel edges fan out vertically.
-    const horizDist = Math.abs(dx);
-    const arcHeight = Math.max(110, Math.min(horizDist * 0.32, 220));
-    const mx = (sourceX + targetX) / 2 + d.pairOffset * 22;
-    const my = (sourceY + targetY) / 2 - arcHeight - Math.abs(d.pairOffset) * 18;
-    path = `M ${sourceX} ${sourceY} Q ${mx} ${my} ${targetX} ${targetY}`;
-    labelX = 0.25 * sourceX + 0.5 * mx + 0.25 * targetX;
-    labelY = 0.25 * sourceY + 0.5 * my + 0.25 * targetY;
-  } else {
-    // Cross-row: orthogonal "step" routing. The edge leaves the source
-    // vertically, runs along a horizontal lane between the rows, then
-    // descends vertically into the target. This never crosses through
-    // a card — each segment is in the gap between rows or in the
-    // vertical channel a node occupies.
-    //
-    // Parallel edges between the same pair offset their lane by `pairOffset`.
-    const laneY = sourceY + dy / 2 + d.pairOffset * 22;
-    const r = 16; // corner radius
-    // If horizontal distance is small, the rounded corners would overlap →
-    // fall back to a smooth bezier
-    if (Math.abs(dx) < r * 2 + 4) {
-      const cx = (sourceX + targetX) / 2 + d.pairOffset * 28;
-      path = `M ${sourceX} ${sourceY} C ${cx} ${laneY} ${cx} ${laneY} ${targetX} ${targetY}`;
-      labelX = (sourceX + targetX) / 2;
-      labelY = laneY;
-    } else {
-      const dir = dx > 0 ? 1 : -1;
-      path = [
-        `M ${sourceX} ${sourceY}`,
-        `L ${sourceX} ${laneY - r * Math.sign(dy)}`,
-        // Round corner from vertical → horizontal
-        `Q ${sourceX} ${laneY} ${sourceX + r * dir} ${laneY}`,
-        `L ${targetX - r * dir} ${laneY}`,
-        // Round corner from horizontal → vertical
-        `Q ${targetX} ${laneY} ${targetX} ${laneY + r * Math.sign(dy)}`,
-        `L ${targetX} ${targetY}`,
-      ].join(' ');
-      labelX = (sourceX + targetX) / 2;
-      labelY = laneY;
-    }
-  }
+  const sNorm = positionToNormal(sourcePosition);
+  const tNorm = positionToNormal(targetPosition);
+
+  // Perpendicular to the source→target line, used to fan parallel edges
+  const perpX = -dy / distance;
+  const perpY = dx / distance;
+  const fan = d.pairOffset * 40;
+
+  const cp1x = sourceX + sNorm.x * extension + perpX * fan;
+  const cp1y = sourceY + sNorm.y * extension + perpY * fan;
+  const cp2x = targetX + tNorm.x * extension + perpX * fan;
+  const cp2y = targetY + tNorm.y * extension + perpY * fan;
+
+  const path = `M ${sourceX} ${sourceY} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${targetX} ${targetY}`;
+
+  // Cubic bezier midpoint at t=0.5
+  const labelX = 0.125 * sourceX + 0.375 * cp1x + 0.375 * cp2x + 0.125 * targetX;
+  const labelY = 0.125 * sourceY + 0.375 * cp1y + 0.375 * cp2y + 0.125 * targetY;
 
   const markerId = `arrow-${d.relationId}`;
 
@@ -114,7 +92,7 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
             <path
               d="M0,1 L0,9 L11,5 z"
               fill={isDimmed ? '#2a3a55' : vs.color}
-              opacity={isDimmed ? 0.45 : 1}
+              opacity={isDimmed ? 0.5 : 1}
             />
           </marker>
         )}
@@ -139,10 +117,7 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
         id={id}
         path={path}
         style={{
-          // Dimmed edges keep their type colour but at low opacity, so the
-          // user can still read the project's overall shape while focusing
-          // on one selection.
-          stroke: isDimmed ? vs.color : vs.color,
+          stroke: vs.color,
           strokeWidth: isDimmed ? Math.max(vs.strokeWidth - 0.6, 1) : vs.strokeWidth,
           strokeDasharray: strokeDashArray,
           strokeLinecap: 'round',
@@ -155,9 +130,8 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
         markerEnd={vs.isDirected && !isDimmed ? `url(#${markerId})` : undefined}
       />
 
-      {/* Numeric badge — only when not dimmed. Tooltip carries the label
-          and description so the user can identify the relation without us
-          stacking pills on every edge. */}
+      {/* Numeric badge with tooltip — colour + number already identify the
+          relation type, so no text pill on the edge itself. */}
       {!isDimmed && (
         <EdgeLabelRenderer>
           <div
@@ -181,6 +155,20 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
       )}
     </>
   );
+}
+
+/**
+ * Outward normal vector for each Handle position. The bezier control
+ * point extends along this vector so the curve leaves the card
+ * perpendicular to the selected side.
+ */
+function positionToNormal(p: Position): { x: number; y: number } {
+  switch (p) {
+    case Position.Top:    return { x: 0,  y: -1 };
+    case Position.Right:  return { x: 1,  y: 0 };
+    case Position.Bottom: return { x: 0,  y: 1 };
+    case Position.Left:   return { x: -1, y: 0 };
+  }
 }
 
 export const ArchitectureEdge = memo(ArchitectureEdgeImpl);

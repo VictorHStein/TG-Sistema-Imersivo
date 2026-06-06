@@ -17,9 +17,17 @@ export interface ArchitectureNodeData extends Record<string, unknown> {
 }
 
 /**
- * Custom React Flow node. Renders an entity with its category color/shape.
- * Long descriptions stay in the side panel; only id + name appear here.
+ * One handle per side, each declared both as source AND target so any edge
+ * can leave or enter the card on whichever side gets it closest to its
+ * partner. The picker in ArchitectureFlow decides which side.
  */
+const HANDLE_POSITIONS: { id: 'top' | 'right' | 'bottom' | 'left'; pos: Position }[] = [
+  { id: 'top',    pos: Position.Top },
+  { id: 'right',  pos: Position.Right },
+  { id: 'bottom', pos: Position.Bottom },
+  { id: 'left',   pos: Position.Left },
+];
+
 function ArchitectureNodeImpl({ data }: NodeProps) {
   const d = data as ArchitectureNodeData;
   const color = d.category.color;
@@ -35,7 +43,13 @@ function ArchitectureNodeImpl({ data }: NodeProps) {
         ['--node-color' as never]: color,
       }}
     >
-      <Handle type="target" position={Position.Top} className="arch-node__handle" />
+      {HANDLE_POSITIONS.map((h) => (
+        <Handle key={`s-${h.id}`} id={h.id} type="source" position={h.pos} className="arch-node__handle" />
+      ))}
+      {HANDLE_POSITIONS.map((h) => (
+        <Handle key={`t-${h.id}`} id={h.id} type="target" position={h.pos} className="arch-node__handle" />
+      ))}
+
       <div className="arch-node__bar" style={{ background: color }} />
       <div className="arch-node__body">
         <div className="arch-node__category" style={{ color }}>
@@ -51,7 +65,6 @@ function ArchitectureNodeImpl({ data }: NodeProps) {
           {d.status && <span className={`arch-node__status status-${d.status}`}>{d.status.replace('_', ' ')}</span>}
         </div>
       </div>
-      <Handle type="source" position={Position.Bottom} className="arch-node__handle" />
     </div>
   );
 }
