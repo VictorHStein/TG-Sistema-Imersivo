@@ -31,6 +31,13 @@
   transition: all var(--transition-fast);
 }
 .hud-btn:hover { color: var(--text-accent); border-color: var(--text-accent); }
+.hud-btn:disabled {
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.hud-btn:disabled:hover { color: var(--text-muted); border-color: var(--border-subtle); }
 .hud-divider {
   width: 1px;
   height: 18px;

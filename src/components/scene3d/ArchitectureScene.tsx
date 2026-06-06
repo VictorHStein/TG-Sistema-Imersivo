@@ -40,15 +40,25 @@ function CameraControls({
 const DEFAULT_CAMERA_POS: [number, number, number] = [22, 17, 22];
 const DEFAULT_CAMERA_TARGET: [number, number, number] = [0, 0, 0];
 
+/**
+ * Moves the camera toward `target` ONLY when `tick` changes — i.e. when
+ * the user explicitly asks for a focus via the HUD button.
+ *
+ * Selection changes no longer move the camera. The user drives navigation
+ * (pan / zoom / rotate) freely; clicking entities just selects them.
+ */
 function CameraFocus({
   target,
+  tick,
   controlsRef,
 }: {
   target: ThreeDPosition | null;
+  tick: number;
   controlsRef: React.MutableRefObject<OrbitControlsImpl | null>;
 }) {
   const { camera } = useThree();
   useEffect(() => {
+    if (tick === 0) return; // skip initial mount
     if (!target) return;
     const t = new Vector3(target.x, target.y, target.z);
     const dist = camera.position.distanceTo(t);
@@ -59,7 +69,8 @@ function CameraFocus({
       controlsRef.current.target.copy(t);
       controlsRef.current.update();
     }
-  }, [target, camera, controlsRef]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
   return null;
 }
 
@@ -104,6 +115,7 @@ function SceneContent({
   const currentStep = useArchitectureStore((s) => s.currentStep);
   const showOnlyCrossCategory = useArchitectureStore((s) => s.showOnlyCrossCategory);
   const cameraResetTick = useArchitectureStore((s) => s.cameraResetTick);
+  const cameraFocusOnSelectedTick = useArchitectureStore((s) => s.cameraFocusOnSelectedTick);
 
   const visibleEntities = useMemo(
     () => computeVisibleEntities(architecture, visibleCategories, explorationMode, currentStep),
@@ -164,7 +176,7 @@ function SceneContent({
       </mesh>
 
       <CameraResetWatcher tick={cameraResetTick} controlsRef={controlsRef} />
-      <CameraFocus target={focusTarget} controlsRef={controlsRef} />
+      <CameraFocus target={focusTarget} tick={cameraFocusOnSelectedTick} controlsRef={controlsRef} />
 
       {/* Entity meshes */}
       {visibleEntities.map((entity) => {
@@ -247,7 +259,9 @@ export function ArchitectureScene() {
   const selectEntity = useArchitectureStore((s) => s.selectEntity);
   const focusSubsystem = useArchitectureStore((s) => s.focusSubsystem);
   const focusedId = useArchitectureStore((s) => s.focusedSubsystemId);
+  const selectedEntityId = useArchitectureStore((s) => s.selectedEntityId);
   const requestCameraReset = useArchitectureStore((s) => s.requestCameraReset);
+  const requestCameraFocusOnSelected = useArchitectureStore((s) => s.requestCameraFocusOnSelected);
 
   // "Centralizar" now does a full reset — both position AND target snap back
   // to the default vantage point. Previously it only re-centred the target,
@@ -281,6 +295,14 @@ export function ArchitectureScene() {
       <div className="scene3d-hud">
         <button className="hud-btn" onClick={recenter} title="Voltar à vista padrão">
           ⟲ Centralizar
+        </button>
+        <button
+          className="hud-btn"
+          onClick={() => requestCameraFocusOnSelected()}
+          disabled={!selectedEntityId}
+          title={selectedEntityId ? 'Mover câmera para o elemento selecionado' : 'Selecione algo primeiro'}
+        >
+          ◎ Focar selecionado
         </button>
         <div className="hud-divider" />
         <div className="hud-label">Focar subsistema:</div>

@@ -50,6 +50,13 @@ interface ArchitectureState {
    * triggered exactly when the value changes.
    */
   cameraResetTick: number;
+  /**
+   * Counter incremented when the user explicitly asks the 3D camera to
+   * move toward the currently-selected entity. Selection on its own
+   * NEVER moves the camera — the user drives navigation. The HUD button
+   * "Focar selecionado" bumps this counter.
+   */
+  cameraFocusOnSelectedTick: number;
 
   /* ── Actions ────────────────────────────────────────────────── */
   loadArchitectureFromJson: (raw: unknown, sourceName?: string) => { ok: boolean; issues: ValidationIssue[] };
@@ -72,6 +79,7 @@ interface ArchitectureState {
   toggleCrossCategoryOnly: () => void;
   toggleCriticalOnly: () => void;
   requestCameraReset: () => void;
+  requestCameraFocusOnSelected: () => void;
 }
 
 function loadDemo() {
@@ -110,6 +118,7 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
   legendOpen: true,
   minimapOpen: false,
   cameraResetTick: 0,
+  cameraFocusOnSelectedTick: 0,
 
   loadArchitectureFromJson: (raw, sourceName) => {
     const result = validateArchitecture(raw);
@@ -207,6 +216,7 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
   toggleCrossCategoryOnly: () => set((s) => ({ showOnlyCrossCategory: !s.showOnlyCrossCategory })),
   toggleCriticalOnly: () => set((s) => ({ emphasizeOnlyCritical: !s.emphasizeOnlyCritical })),
   requestCameraReset: () => set((s) => ({ cameraResetTick: s.cameraResetTick + 1 })),
+  requestCameraFocusOnSelected: () => set((s) => ({ cameraFocusOnSelectedTick: s.cameraFocusOnSelectedTick + 1 })),
 }));
 
 /* ── Helpers ──────────────────────────────────────────────────
