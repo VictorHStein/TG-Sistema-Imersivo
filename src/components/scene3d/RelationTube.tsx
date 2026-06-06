@@ -11,6 +11,12 @@ interface RelationTubeProps {
   style: RelationVisualStyle;
   selected: boolean;
   emphasizedByFilter: boolean;
+  /**
+   * True when the user has SOMETHING selected and this tube does NOT
+   * connect to it. Treated like the 2D dimmed case: the tube is rendered
+   * extremely faint with no badge so the active relations dominate.
+   */
+  dimmed: boolean;
   showBadge: boolean;
   onSelect: (id: string) => void;
 }
@@ -30,6 +36,7 @@ export function RelationTube({
   style,
   selected,
   emphasizedByFilter,
+  dimmed,
   showBadge,
   onSelect,
 }: RelationTubeProps) {
@@ -55,13 +62,27 @@ export function RelationTube({
     ];
   }, [from, to]);
 
+  // Dimmed tubes are a near-invisible hint of presence, no badge, no
+  // emissive glow. Mirrors the 2D behaviour the user asked for.
+  if (dimmed) {
+    return (
+      <mesh geometry={tubeGeom}>
+        <meshBasicMaterial
+          color={style.color}
+          transparent
+          opacity={0.05}
+        />
+      </mesh>
+    );
+  }
+
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(relationId); }}>
       <mesh geometry={tubeGeom}>
         <meshStandardMaterial
           color={style.color}
           emissive={style.color}
-          emissiveIntensity={selected ? 0.9 : emphasizedByFilter ? 0.45 : 0.2}
+          emissiveIntensity={selected ? 1.0 : emphasizedByFilter ? 0.55 : 0.25}
           transparent
           opacity={style.opacity}
           metalness={0.4}

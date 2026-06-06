@@ -116,32 +116,32 @@
 }
 
 /*
- * Selection hierarchy. We deliberately keep dimmed cards visible enough
- * for a "general check-up" overview — the user asked to never lose
- * sight of the rest of the project when something is selected.
+ * Selection hierarchy. When something is selected, unrelated cards
+ * almost disappear so the active relations stand out clearly.
  *
  *   • is-selected   → bright, glowing, full accent (THE node)
- *   • is-highlighted→ visible but clearly secondary; related via relations
- *                     (thin accent border, no glow, more transparent)
- *   • is-dimmed     → unrelated; still legible, just receded
+ *   • is-highlighted→ related via relations — almost full opacity, accent
+ *                     border, but no glow so it's not confused with selected
+ *   • is-dimmed     → unrelated; pushed deep into the background (8%)
  */
 .arch-node.is-selected {
   border-color: var(--node-color);
-  background: color-mix(in srgb, var(--node-color) 18%, rgba(13,25,46,0.95));
+  background: color-mix(in srgb, var(--node-color) 20%, rgba(13,25,46,0.97));
   box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--node-color) 50%, transparent),
-    0 0 36px color-mix(in srgb, var(--node-color) 45%, transparent);
+    0 0 0 3px color-mix(in srgb, var(--node-color) 55%, transparent),
+    0 0 40px color-mix(in srgb, var(--node-color) 50%, transparent);
   z-index: 5;
 }
 .arch-node.is-highlighted {
-  border-color: color-mix(in srgb, var(--node-color) 45%, transparent);
-  background: rgba(13,25,46,0.85);
-  opacity: 0.55;
-  filter: saturate(0.8);
+  border-color: var(--node-color);
+  background: color-mix(in srgb, var(--node-color) 10%, rgba(13,25,46,0.92));
+  opacity: 0.92;
+  z-index: 3;
 }
 .arch-node.is-dimmed {
-  opacity: 0.4;
-  filter: saturate(0.55);
+  opacity: 0.08;
+  filter: saturate(0.35) blur(0.4px);
+  pointer-events: none;
 }
 
 /* Shape variations */

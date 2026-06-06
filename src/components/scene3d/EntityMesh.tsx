@@ -60,8 +60,11 @@ export function EntityMesh({
     return (h / 360) * Math.PI * 2;
   }, [entity.id]);
 
-  const opacity = isDimmed ? 0.22 : isSelected ? 1 : isHighlighted ? 0.96 : 0.85;
-  const emissiveIntensity = isSelected ? 0.85 : isHighlighted ? 0.4 : hovered ? 0.5 : 0.2;
+  // Dimmed meshes fade almost out so the active relations dominate the
+  // scene; selected stays bright; highlighted (directly related) reads
+  // somewhere between but is clearly secondary.
+  const opacity = isDimmed ? 0.08 : isSelected ? 1 : isHighlighted ? 0.95 : 0.85;
+  const emissiveIntensity = isDimmed ? 0.02 : isSelected ? 0.95 : isHighlighted ? 0.45 : hovered ? 0.5 : 0.2;
 
   useFrame((state, dt) => {
     if (!ref.current || !groupRef.current) return;

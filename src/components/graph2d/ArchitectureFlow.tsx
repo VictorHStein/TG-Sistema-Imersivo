@@ -254,6 +254,15 @@ function FlowCanvas() {
       const tgtPos = layout.positions.get(relation.target);
       const handles = pickHandles(srcPos, tgtPos);
 
+      // If source and target are more than one row apart, the bezier
+      // midpoint can land on top of a card on an intermediate row. Slide
+      // the badge along the curve toward source (t=0.25) so it sits in
+      // the empty gap right below the source row.
+      const rowDist = srcPos && tgtPos
+        ? Math.abs(srcPos.row - tgtPos.row)
+        : 0;
+      const badgeT = rowDist > 1 ? 0.25 : 0.5;
+
       const data: ArchitectureEdgeData = {
         relationId: relation.id,
         style: vs,
@@ -267,6 +276,7 @@ function FlowCanvas() {
         pairOffset,
         pairTotal: total,
         animated: isFlowy,
+        badgeT,
       };
 
       return {

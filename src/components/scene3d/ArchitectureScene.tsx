@@ -229,7 +229,8 @@ function SceneContent({
             style={vs}
             selected={isSelected}
             emphasizedByFilter={inFocus}
-            showBadge={showBadge}
+            dimmed={isDimmed}
+            showBadge={showBadge && !isDimmed}
             onSelect={selectRelation}
           />
         );

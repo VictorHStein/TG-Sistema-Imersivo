@@ -18,6 +18,8 @@ export interface ArchitectureEdgeData extends Record<string, unknown> {
   pairTotal: number;
   /** When true, animate a dash flow along the path. */
   animated: boolean;
+  /** Where to put the badge along the curve, in (0,1). 0.5 = midpoint. */
+  badgeT: number;
 }
 
 /**
@@ -66,15 +68,44 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
 
   const path = `M ${sourceX} ${sourceY} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${targetX} ${targetY}`;
 
-  // Cubic bezier midpoint at t=0.5
-  const labelX = 0.125 * sourceX + 0.375 * cp1x + 0.375 * cp2x + 0.125 * targetX;
-  const labelY = 0.125 * sourceY + 0.375 * cp1y + 0.375 * cp2y + 0.125 * targetY;
+  // Badge position along the curve. t comes from the flow component: it
+  // picks t=0.5 (midpoint) when source and target are at most one row
+  // apart, and t=0.25 (closer to source) when farther, so the badge sits
+  // in the empty gap below the source row instead of stacking on top of
+  // an intermediate card.
+  const t = d.badgeT ?? 0.5;
+  const omt = 1 - t;
+  const a = omt * omt * omt;
+  const b = 3 * omt * omt * t;
+  const c = 3 * omt * t * t;
+  const e = t * t * t;
+  const labelX = a * sourceX + b * cp1x + c * cp2x + e * targetX;
+  const labelY = a * sourceY + b * cp1y + c * cp2y + e * targetY;
 
   const markerId = `arrow-${d.relationId}`;
 
   const dashFromStyle = vs.dashArray === 'none' ? undefined : vs.dashArray;
   const animDash = d.animated && !isDimmed ? '12 8' : undefined;
   const strokeDashArray = animDash ?? dashFromStyle;
+
+  // When something is selected and this edge is unrelated, hide it almost
+  // entirely. The user asked for "ligações inativas" to disappear so the
+  // active ones read clearly. We don't render arrowheads or badges at all
+  // for dimmed edges and the stroke fades to a faint hint.
+  if (isDimmed) {
+    return (
+      <BaseEdge
+        id={id}
+        path={path}
+        style={{
+          stroke: vs.color,
+          strokeWidth: 1,
+          opacity: 0.05,
+          fill: 'none',
+        }}
+      />
+    );
+  }
 
   return (
     <>
@@ -91,15 +122,15 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
           >
             <path
               d="M0,1 L0,9 L11,5 z"
-              fill={isDimmed ? '#2a3a55' : vs.color}
-              opacity={isDimmed ? 0.5 : 1}
+              fill={vs.color}
+              opacity={1}
             />
           </marker>
         )}
       </defs>
 
       {/* Soft glow underline for emphasized / selected cross-category edges */}
-      {(isSelected || (isEmphasized && vs.isCrossCategory)) && !isDimmed && (
+      {(isSelected || (isEmphasized && vs.isCrossCategory)) && (
         <BaseEdge
           id={`${id}-glow`}
           path={path}
@@ -118,41 +149,38 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
         path={path}
         style={{
           stroke: vs.color,
-          strokeWidth: isDimmed ? Math.max(vs.strokeWidth - 0.6, 1) : vs.strokeWidth,
+          strokeWidth: vs.strokeWidth,
           strokeDasharray: strokeDashArray,
           strokeLinecap: 'round',
-          opacity: isDimmed ? 0.35 : vs.opacity,
+          opacity: vs.opacity,
           fill: 'none',
-          animation: d.animated && !isDimmed
+          animation: d.animated
             ? `arch-edge-flow ${isSelected ? 1.4 : 2.2}s linear infinite`
             : undefined,
         }}
-        markerEnd={vs.isDirected && !isDimmed ? `url(#${markerId})` : undefined}
+        markerEnd={vs.isDirected ? `url(#${markerId})` : undefined}
       />
 
-      {/* Numeric badge with tooltip — colour + number already identify the
-          relation type, so no text pill on the edge itself. */}
-      {!isDimmed && (
-        <EdgeLabelRenderer>
-          <div
-            className="arch-edge-badge-wrap"
-            style={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              pointerEvents: 'all',
-              cursor: 'pointer',
-              zIndex: 5,
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              d.onClick?.(d.relationId);
-            }}
-            title={`${relationIndex}. ${d.relationTypeLabel}${d.description ? ` — ${d.description}` : ''}`}
-          >
-            <RelationBadge index={relationIndex} color={vs.color} emphasized={isEmphasized} selected={isSelected} />
-          </div>
-        </EdgeLabelRenderer>
-      )}
+      {/* Numeric badge with tooltip */}
+      <EdgeLabelRenderer>
+        <div
+          className="arch-edge-badge-wrap"
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+            cursor: 'pointer',
+            zIndex: 5,
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            d.onClick?.(d.relationId);
+          }}
+          title={`${relationIndex}. ${d.relationTypeLabel}${d.description ? ` — ${d.description}` : ''}`}
+        >
+          <RelationBadge index={relationIndex} color={vs.color} emphasized={isEmphasized} selected={isSelected} />
+        </div>
+      </EdgeLabelRenderer>
     </>
   );
 }
