@@ -75,10 +75,25 @@ export function EntityMesh({
     groupRef.current.position.y = position[1] + Math.sin(t * 0.5 + phase) * amp;
   });
 
-  // When something is selected and this mesh isn't part of it, render
-  // nothing — keeps the scene readable and matches the user's request
-  // to make unrelated elements 100% transparent in 3D.
-  if (isDimmed) return null;
+  // Dimmed entities stay visible as transparent ghosts so you can still
+  // see the rest of the architecture's shape; only the tubes pointing at
+  // them disappear (handled in RelationTube). No labels and no halo for
+  // dimmed meshes — they read as background-only.
+  if (isDimmed) {
+    return (
+      <group position={position}>
+        <mesh>
+          {renderGeometry(shape, baseSize)}
+          <meshBasicMaterial
+            color={category.color}
+            transparent
+            opacity={0.18}
+            depthWrite={false}
+          />
+        </mesh>
+      </group>
+    );
+  }
 
   return (
     <group ref={groupRef} position={position}>

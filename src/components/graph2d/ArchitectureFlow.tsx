@@ -29,16 +29,19 @@ const EDGE_TYPES = { architecture: ArchitectureEdge } as const;
 type HandleId = 'top' | 'right' | 'bottom' | 'left';
 
 /**
- * For cross-row edges (≥ 2 rows apart), checks every intermediate-row
- * card to see if the straight midpoint of the curve would crash into it.
- * If yes, returns a signed horizontal shift (in px) that the edge should
- * apply to its control points so the curve bows around the obstacle.
+ * Gap routing for cross-row edges.
  *
- * Positive = push the bow rightward; negative = leftward.
+ *   1. Find every card on the rows STRICTLY BETWEEN source.row and target.row.
+ *   2. If the geometric midpoint of the straight curve lands inside any of
+ *      them (with 20 px tolerance), the curve would cross a card.
+ *   3. Walk the cards left-to-right; identify the empty gaps between them.
+ *      Also add a sentinel gap to the far left/right of the row.
+ *   4. Pick the empty gap whose centre is CLOSEST to the straight midpoint.
+ *   5. Return the control-point shift that makes the bezier midpoint land
+ *      in that gap's centre. The bezier midpoint moves ~75 % of the
+ *      control-point shift, so we divide by 0.75.
  *
- * The shift is sized so the bezier midpoint clears the card by ~40 px.
- * Because the bezier midpoint moves ~75% of the control-point shift,
- * we multiply the required clearance by 1/0.75 ≈ 1.4.
+ *   Returns 0 when no detour is needed.
  */
 function computeObstacleShift(
   src: { x: number; y: number; row: number } | undefined,
@@ -53,25 +56,47 @@ function computeObstacleShift(
   const maxRow = Math.max(src.row, tgt.row);
   const midX = (src.x + tgt.x) / 2 + nodeWidth / 2;
 
-  let bestShift = 0;
-  let bestAbs = 0;
+  // Collect cards on intermediate rows
+  const cardRanges: Array<[number, number]> = [];
   for (const pos of layoutPositions.values()) {
     if (pos.row <= minRow || pos.row >= maxRow) continue;
-    const left = pos.x - 30;
-    const right = pos.x + nodeWidth + 30;
-    if (midX < left || midX > right) continue;
-    // Collision. Push toward whichever side is closer.
-    const distLeft = midX - left;       // how far past the card's left edge
-    const distRight = right - midX;     // how far before the card's right edge
-    const shift = distLeft < distRight
-      ? -(distLeft + 40) * 1.4   // push left
-      : (distRight + 40) * 1.4;  // push right
-    if (Math.abs(shift) > bestAbs) {
-      bestAbs = Math.abs(shift);
-      bestShift = shift;
+    cardRanges.push([pos.x, pos.x + nodeWidth]);
+  }
+  if (cardRanges.length === 0) return 0;
+
+  // Is midX colliding with any card (with tolerance)?
+  const collides = cardRanges.some(([l, r]) => midX >= l - 20 && midX <= r + 20);
+  if (!collides) return 0;
+
+  // Sort by X
+  cardRanges.sort((a, b) => a[0] - b[0]);
+
+  // Build the list of empty gaps (centres). Each gap needs ≥ 80 px of room
+  // so the curve actually fits.
+  const gapCentres: number[] = [];
+  for (let i = 0; i < cardRanges.length - 1; i++) {
+    const right = cardRanges[i][1];
+    const left = cardRanges[i + 1][0];
+    if (left - right >= 80) gapCentres.push((right + left) / 2);
+  }
+  // Far-left and far-right outside the cards
+  gapCentres.push(cardRanges[0][0] - 140);
+  gapCentres.push(cardRanges[cardRanges.length - 1][1] + 140);
+
+  // Pick the gap centre closest to the straight midpoint
+  let bestGap = gapCentres[0];
+  let bestDist = Math.abs(bestGap - midX);
+  for (const g of gapCentres) {
+    const d = Math.abs(g - midX);
+    if (d < bestDist) {
+      bestDist = d;
+      bestGap = g;
     }
   }
-  return bestShift;
+
+  // Control-point shift that lands the bezier midpoint inside bestGap.
+  const desiredMidShift = bestGap - midX;
+  return desiredMidShift / 0.75;
 }
 
 /**
