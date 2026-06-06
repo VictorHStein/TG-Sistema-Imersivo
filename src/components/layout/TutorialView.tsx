@@ -1,38 +1,55 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useArchitectureStore } from '../../state/architectureStore';
 import { validateArchitecture, type ValidationIssue } from '../../domain/parser/validateArchitecture';
+import { parseCommand, type AnyDoc } from '../../domain/parser/commandParser';
+import { VoiceInput } from './VoiceInput';
 
 /**
- * Interactive JSON builder.
+ * Construtor — no-code editor for the architecture JSON.
  *
- * The user assembles their own architecture step-by-step:
- *  - left column: condensed reference + quick-add buttons that mutate the
- *    JSON in the editor
- *  - middle column: live JSON editor (textarea)
- *  - right column: validation status + apply / reset / load demo / start empty
- *
- * "Aplicar" parses + validates + loads into the global store, so the user
- * can switch to 2D/3D and immediately see what they wrote.
+ *   • A natural-language command bar at the top (with mic). Type or
+ *     dictate things like "adicione um subsistema chamado Bateria sob
+ *     EPS" or "conectar EPS a OBC tipo potência" and the JSON mutates.
+ *   • Three lists below: Categorias, Entidades, Relações. Each item has
+ *     inline delete; clicking the row selects it for editing.
+ *   • A collapsible JSON editor on the side for power-users.
+ *   • Apply buttons at the bottom to send the architecture to the
+ *     2D / 3D viewers.
  */
 
-const EMPTY_SKELETON = {
+const EMPTY_SKELETON: AnyDoc = {
   metadata: { projectName: 'Minha Arquitetura', version: '0.1.0', description: '' },
-  mission: { id: 'mission_x', name: 'Minha Missão', objectives: [] as string[] },
+  mission: { id: 'mission_x', name: 'Minha Missão', objectives: [] },
   categories: [
     { id: 'mission',      label: 'Missão',      color: '#a855f7', shape2D: 'hexagon',  shape3D: 'sphere' },
     { id: 'requirement',  label: 'Requisito',   color: '#2563eb', shape2D: 'document', shape3D: 'flatPanel' },
     { id: 'subsystem',    label: 'Subsistema',  color: '#22c55e', shape2D: 'group',    shape3D: 'box' },
   ],
   relationTypes: [
-    { id: 'satisfies',         index: 1, label: 'Satisfaz requisito', color: '#2563eb', lineStyle: 'solid',  directed: true,  description: 'Source satisfaz o requisito target.' },
-    { id: 'provides_power_to', index: 2, label: 'Fornece potência',   color: '#f59e0b', lineStyle: 'solid',  directed: true,  description: 'Source fornece energia para target.' },
+    { id: 'satisfies',         index: 1, label: 'Satisfaz requisito', color: '#2563eb', lineStyle: 'solid', directed: true, description: 'Source satisfaz o requisito target.' },
+    { id: 'provides_power_to', index: 2, label: 'Fornece potência',   color: '#f59e0b', lineStyle: 'solid', directed: true, description: 'Source fornece energia para target.' },
   ],
   entities: [
-    { id: 'mission_x', name: 'Minha Missão',  category: 'mission',     step: 1, description: '' },
+    { id: 'mission_x', name: 'Minha Missão', category: 'mission', step: 1, description: '' },
   ],
-  relations: [] as Array<Record<string, unknown>>,
+  relations: [],
   views: { defaultStep: 1, maxStep: 6 },
 };
+
+const SAMPLE_COMMANDS = [
+  'adicione um subsistema chamado Bateria sob EPS',
+  'criar componente chamado Painel solar sob EPS',
+  'conectar EPS a OBC tipo potência',
+  'criar categoria Verificação cor #ef4444',
+  'renomear EPS para Subsistema Elétrico',
+  'remover bateria',
+];
+
+interface FeedbackMessage {
+  text: string;
+  ok: boolean;
+  ts: number;
+}
 
 export function TutorialView() {
   const architecture = useArchitectureStore((s) => s.architecture);
@@ -40,42 +57,148 @@ export function TutorialView() {
   const setViewMode = useArchitectureStore((s) => s.setViewMode);
   const resetToDemo = useArchitectureStore((s) => s.resetToDemo);
 
-  // Initial editor content: serialize the currently-loaded architecture
-  // (strip derived fields so the user sees only what they would type).
   const initialText = useMemo(() => buildEditorText(architecture), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [text, setText] = useState(initialText);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [status, setStatus] = useState<'idle' | 'ok' | 'error'>('idle');
   const [dirty, setDirty] = useState(false);
-  const taRef = useRef<HTMLTextAreaElement>(null);
+  const [commandText, setCommandText] = useState('');
+  const [liveVoice, setLiveVoice] = useState('');
+  const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const cmdInputRef = useRef<HTMLInputElement>(null);
 
-  // Validate-as-you-type (cheap debounce)
+  /* ── Validation (debounced) ──────────────────────────── */
   useEffect(() => {
     const t = setTimeout(() => {
       try {
         const parsed = JSON.parse(text);
         const result = validateArchitecture(parsed);
         if (result.ok) {
-          setIssues([]);
-          setStatus('ok');
+          setIssues([]); setStatus('ok');
         } else {
-          setIssues(result.issues);
-          setStatus('error');
+          setIssues(result.issues); setStatus('error');
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'JSON inválido';
-        setIssues([{ path: '(raiz)', message: `JSON sintáticamente inválido: ${msg}` }]);
+        setIssues([{ path: '(raiz)', message: `JSON sintaticamente inválido: ${msg}` }]);
         setStatus('error');
       }
     }, 300);
     return () => clearTimeout(t);
   }, [text]);
 
+  const parsedDoc = useMemo<AnyDoc | null>(() => {
+    try { return JSON.parse(text); } catch { return null; }
+  }, [text]);
+
+  /* ── Mutations ──────────────────────────────────────── */
+
+  const runMutation = useCallback((mutator: (d: AnyDoc) => void, description: string) => {
+    try {
+      const doc = JSON.parse(text) as AnyDoc;
+      mutator(doc);
+      setText(JSON.stringify(doc, null, 2));
+      setDirty(true);
+      setFeedback({ text: `✓ ${description}`, ok: true, ts: Date.now() });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '?';
+      setFeedback({ text: `Erro ao aplicar: ${msg}`, ok: false, ts: Date.now() });
+    }
+  }, [text]);
+
+  const dispatchCommand = useCallback((raw: string) => {
+    if (!raw.trim() || !parsedDoc) return;
+    const result = parseCommand(raw, parsedDoc);
+    if (!result.ok || !result.mutation) {
+      setFeedback({ text: result.description || 'Não entendi.', ok: false, ts: Date.now() });
+      return;
+    }
+    runMutation(result.mutation, result.description);
+    setCommandText('');
+    setLiveVoice('');
+  }, [parsedDoc, runMutation]);
+
+  /* ── Quick-add buttons ───────────────────────────────── */
+
+  const addCategory = () => runMutation((d) => {
+    const n = (d.categories?.length ?? 0) + 1;
+    (d.categories ||= []).push({
+      id: `cat_${n}`, label: `Categoria ${n}`, color: pickColor(n),
+      shape2D: 'box', shape3D: 'box',
+    });
+  }, `Nova categoria cat_${(parsedDoc?.categories?.length ?? 0) + 1}`);
+
+  const addRelationType = () => {
+    const existing = (parsedDoc?.relationTypes ?? []) as Array<{ index?: number }>;
+    const nextIndex = Math.max(0, ...existing.map((r) => Number(r.index ?? 0))) + 1;
+    runMutation((d) => {
+      (d.relationTypes ||= []).push({
+        id: `rel_type_${nextIndex}`, index: nextIndex,
+        label: `Relação ${nextIndex}`, color: pickColor(nextIndex + 6),
+        lineStyle: 'solid', directed: true,
+        description: 'Descreva o significado desta relação.',
+      });
+    }, `Tipo de relação #${nextIndex}`);
+  };
+
+  const addEntity = () => {
+    const n = (parsedDoc?.entities?.length ?? 0) + 1;
+    runMutation((d) => {
+      const firstCat = ((d.categories ?? [])[0] as { id?: string })?.id ?? 'subsystem';
+      (d.entities ||= []).push({
+        id: `ent_${n}`, name: `Entidade ${n}`,
+        category: firstCat, step: 1, description: '',
+      });
+    }, `Nova entidade ent_${n}`);
+  };
+
+  const addRelation = () => {
+    const ents = (parsedDoc?.entities ?? []) as Array<{ id?: string }>;
+    const types = (parsedDoc?.relationTypes ?? []) as Array<{ id?: string }>;
+    if (ents.length < 2 || types.length === 0) {
+      setFeedback({ text: 'Crie ao menos 2 entidades e 1 tipo de relação antes', ok: false, ts: Date.now() });
+      return;
+    }
+    const n = (parsedDoc?.relations?.length ?? 0) + 1;
+    runMutation((d) => {
+      (d.relations ||= []).push({
+        id: `rel_${n}`, type: types[0].id, source: ents[0].id, target: ents[1].id,
+        step: 1, label: '',
+      });
+    }, `Nova relação ${ents[0].id} → ${ents[1].id}`);
+  };
+
+  /* ── Delete from inline buttons ──────────────────────── */
+
+  const deleteEntity = (id: string) => runMutation((d) => {
+    d.entities = (d.entities ?? []).filter((e) => (e as { id?: string }).id !== id);
+    d.relations = (d.relations ?? []).filter((r) => {
+      const rr = r as { source?: string; target?: string };
+      return rr.source !== id && rr.target !== id;
+    });
+  }, `Removida entidade ${id}`);
+
+  const deleteCategory = (id: string) => runMutation((d) => {
+    d.categories = (d.categories ?? []).filter((c) => (c as { id?: string }).id !== id);
+  }, `Removida categoria ${id}`);
+
+  const deleteRelation = (id: string) => runMutation((d) => {
+    d.relations = (d.relations ?? []).filter((r) => (r as { id?: string }).id !== id);
+  }, `Removida relação ${id}`);
+
+  const deleteRelationType = (id: string) => runMutation((d) => {
+    d.relationTypes = (d.relationTypes ?? []).filter((t) => (t as { id?: string }).id !== id);
+  }, `Removido tipo de relação ${id}`);
+
+  /* ── Apply ────────────────────────────────────────────── */
+
   const onApply = () => {
     try {
       const raw = JSON.parse(text);
       loadArchitectureFromJson(raw, 'Construtor');
       setDirty(false);
+      setFeedback({ text: 'Arquitetura aplicada — abra 2D ou 3D para ver', ok: true, ts: Date.now() });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'JSON inválido';
       setIssues([{ path: '(raiz)', message: msg }]);
@@ -83,216 +206,200 @@ export function TutorialView() {
     }
   };
 
-  const onStartEmpty = () => {
-    setText(JSON.stringify(EMPTY_SKELETON, null, 2));
-    setDirty(true);
-  };
-
+  const onStartEmpty = () => { setText(JSON.stringify(EMPTY_SKELETON, null, 2)); setDirty(true); };
   const onLoadDemo = () => {
     resetToDemo();
     setTimeout(() => {
-      const arch = useArchitectureStore.getState().architecture;
-      setText(buildEditorText(arch));
+      const a = useArchitectureStore.getState().architecture;
+      setText(buildEditorText(a));
       setDirty(false);
     }, 0);
   };
 
-  const onResetToCurrent = () => {
-    setText(buildEditorText(architecture));
-    setDirty(false);
-  };
-
-  /* ── Quick-add helpers — mutate the JSON in the editor ─────── */
-  const addCategory = () => mutate((doc) => {
-    const n = (doc.categories?.length ?? 0) + 1;
-    (doc.categories ||= []).push({
-      id: `cat_${n}`,
-      label: `Categoria ${n}`,
-      color: pickColor(n),
-      shape2D: 'box',
-      shape3D: 'box',
-    });
-  });
-
-  const addRelationType = () => mutate((doc) => {
-    const existing = (doc.relationTypes ?? []).map((r: any) => Number(r.index || 0));
-    const nextIndex = Math.max(0, ...existing) + 1;
-    (doc.relationTypes ||= []).push({
-      id: `rel_type_${nextIndex}`,
-      index: nextIndex,
-      label: `Relação ${nextIndex}`,
-      color: pickColor(nextIndex + 6),
-      lineStyle: 'solid',
-      directed: true,
-      description: 'Descreva o significado desta relação.',
-    });
-  });
-
-  const addEntity = () => mutate((doc) => {
-    const n = (doc.entities?.length ?? 0) + 1;
-    const firstCat = (doc.categories ?? [])[0]?.id ?? 'subsystem';
-    (doc.entities ||= []).push({
-      id: `ent_${n}`,
-      name: `Entidade ${n}`,
-      category: firstCat,
-      step: 1,
-      description: '',
-    });
-  });
-
-  const addRelation = () => mutate((doc) => {
-    const n = (doc.relations?.length ?? 0) + 1;
-    const ents: any[] = doc.entities ?? [];
-    const types: any[] = doc.relationTypes ?? [];
-    if (ents.length < 2 || types.length === 0) return;
-    (doc.relations ||= []).push({
-      id: `rel_${n}`,
-      type: types[0].id,
-      source: ents[0].id,
-      target: ents[1].id,
-      step: 1,
-      label: '',
-    });
-  });
-
-  function mutate(fn: (doc: any) => void) {
-    try {
-      const doc = JSON.parse(text);
-      fn(doc);
-      setText(JSON.stringify(doc, null, 2));
-      setDirty(true);
-      // focus the textarea so the user sees the new lines
-      setTimeout(() => taRef.current?.focus(), 0);
-    } catch {
-      // ignore — current text is invalid JSON
-    }
-  }
+  /* ── Auto-focus the command bar on '/' (Slack/Discord-style) ── */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        cmdInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
-    <div className="builder">
-      <aside className="builder-aside">
-        <div className="builder-aside__head">Construtor de JSON</div>
-        <p className="builder-aside__lead">
-          Monte sua própria arquitetura, do zero ou a partir da demo.
-          Tudo que você escrever aqui é validado em tempo real; clique <strong>Aplicar</strong> para ver no Grafo 2D e na Cena 3D.
-        </p>
-
-        <Section title="Comece por">
-          <button className="builder-btn" onClick={onStartEmpty}>Esqueleto mínimo</button>
-          <button className="builder-btn" onClick={onLoadDemo}>Carregar demo</button>
-          <button className="builder-btn builder-btn--ghost" onClick={onResetToCurrent}>
-            Reverter para o que está aplicado
+    <div className={`builder${jsonOpen ? ' builder--json-open' : ''}`}>
+      {/* ─── Top: NL command bar ─────────────────────────── */}
+      <div className="builder-cmdbar">
+        <div className="builder-cmdbar__row">
+          <span className="builder-cmdbar__prompt">›</span>
+          <input
+            ref={cmdInputRef}
+            className="builder-cmdbar__input"
+            placeholder="Diga o que fazer… (ex: adicione um subsistema chamado Bateria sob EPS)"
+            value={commandText}
+            onChange={(e) => setCommandText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') dispatchCommand(commandText);
+              else if (e.key === 'Escape') { setCommandText(''); e.currentTarget.blur(); }
+            }}
+            spellCheck={false}
+          />
+          <VoiceInput
+            onResult={(t) => { setCommandText(t); dispatchCommand(t); }}
+            onLiveTranscript={setLiveVoice}
+          />
+          <button
+            className="builder-cmdbar__send"
+            onClick={() => dispatchCommand(commandText)}
+            disabled={!commandText.trim()}
+          >
+            Aplicar
           </button>
-        </Section>
-
-        <Section title="Adicionar bloco">
-          <button className="builder-btn" onClick={addCategory}>+ Categoria</button>
-          <button className="builder-btn" onClick={addRelationType}>+ Tipo de relação (numerado)</button>
-          <button className="builder-btn" onClick={addEntity}>+ Entidade</button>
-          <button className="builder-btn" onClick={addRelation}>+ Relação</button>
-        </Section>
-
-        <Section title="O que cada bloco faz">
-          <Help heading="categories">
-            Define os <em>tipos de entidade</em> e seus visuais (cor, formato 2D e 3D). Os ids canônicos
-            (<code>mission</code>, <code>requirement</code>, <code>function</code>, <code>subsystem</code>, <code>component</code>, <code>verification</code>)
-            ganham anéis próprios no 3D.
-          </Help>
-          <Help heading="relationTypes">
-            Cada tipo de relação tem um <strong>número único</strong> (campo <code>index</code>) que vira badge sobre cada
-            aresta. <code>lineStyle</code> aceita <code>solid</code> · <code>dashed</code> · <code>dotted</code>. <code>directed</code> desenha a seta.
-          </Help>
-          <Help heading="entities">
-            Os blocos. Precisam de <code>id</code>, <code>name</code>, <code>category</code>, <code>step</code>. Use <code>parentId</code> para hierarquia
-            (gera o código <em>1.2.1</em>).
-          </Help>
-          <Help heading="relations">
-            Arestas entre entidades. <code>type</code> aponta para um <code>relationTypes.id</code>;
-            <code>source</code>/<code>target</code> apontam para <code>entities.id</code>. Quando as categorias dos endpoints diferem,
-            a aresta fica visualmente mais pesada.
-          </Help>
-          <Help heading="views (opcional)">
-            <code>defaultStep</code> define em que etapa o "Por etapas" começa. <code>maxStep</code> limita a timeline.
-          </Help>
-        </Section>
-
-        <Section title="Regras de validação">
-          <ul className="builder-rules">
-            <li>Ids únicos em <code>entities</code>, <code>relations</code>, <code>relationTypes</code>, <code>categories</code>.</li>
-            <li><code>index</code> único entre os tipos de relação.</li>
-            <li><code>relation.source</code>/<code>target</code> precisam existir em <code>entities</code>.</li>
-            <li><code>relation.type</code> precisa existir em <code>relationTypes</code>.</li>
-            <li><code>entity.category</code> precisa existir em <code>categories</code>.</li>
-            <li>Cores em hex (<code>#rgb</code> ou <code>#rrggbb</code>).</li>
-          </ul>
-        </Section>
-      </aside>
-
-      <section className="builder-editor">
-        <header className="builder-editor__head">
-          <div className="builder-editor__title">
-            <span className="builder-dot" /> minha-arquitetura.json
-            {dirty && <span className="builder-dirty">não aplicado</span>}
+        </div>
+        {liveVoice && (
+          <div className="builder-cmdbar__live">🎙 {liveVoice}</div>
+        )}
+        {feedback && (
+          <div className={`builder-cmdbar__feedback${feedback.ok ? ' is-ok' : ' is-error'}`}>
+            {feedback.text}
           </div>
-          <div className="builder-editor__actions">
+        )}
+        <div className="builder-cmdbar__samples">
+          <span className="builder-cmdbar__samples-head">Tente:</span>
+          {SAMPLE_COMMANDS.map((s) => (
             <button
-              className={`builder-btn builder-btn--primary${status === 'error' ? ' is-disabled' : ''}`}
-              disabled={status === 'error'}
-              onClick={onApply}
+              key={s}
+              className="builder-cmdbar__sample"
+              onClick={() => { setCommandText(s); cmdInputRef.current?.focus(); }}
             >
-              Aplicar &nbsp;&rarr;&nbsp; visualizar
+              {s}
             </button>
-            <button className="builder-btn" onClick={() => { onApply(); setViewMode('2d'); }}>
-              Aplicar e ir para 2D
-            </button>
-            <button className="builder-btn builder-btn--ghost" onClick={() => { onApply(); setViewMode('3d'); }}>
-              Aplicar e ir para 3D
-            </button>
-          </div>
-        </header>
+          ))}
+        </div>
+      </div>
 
-        <textarea
-          ref={taRef}
-          className="builder-textarea"
-          value={text}
-          onChange={(e) => { setText(e.target.value); setDirty(true); }}
-          spellCheck={false}
-        />
+      {/* ─── Main: 3 lists + side JSON ───────────────────── */}
+      <div className="builder-grid">
+        <Pane title="Categorias" actionLabel="+ Adicionar" onAction={addCategory}>
+          {((parsedDoc?.categories ?? []) as Array<{ id?: string; label?: string; color?: string }>).map((c) => (
+            <Card
+              key={String(c.id)}
+              accent={c.color}
+              title={String(c.label ?? c.id)}
+              subtitle={String(c.id)}
+              onDelete={() => deleteCategory(String(c.id))}
+            />
+          ))}
+        </Pane>
 
-        <footer className={`builder-status builder-status--${status}`}>
-          {status === 'ok' && (
-            <span>
-              ✓ JSON válido — {(safeParseCount(text, 'entities'))} entidades,&nbsp;
-              {(safeParseCount(text, 'relations'))} relações,&nbsp;
-              {(safeParseCount(text, 'categories'))} categorias,&nbsp;
-              {(safeParseCount(text, 'relationTypes'))} tipos de relação.
-            </span>
-          )}
+        <Pane title="Tipos de relação" actionLabel="+ Adicionar" onAction={addRelationType}>
+          {((parsedDoc?.relationTypes ?? []) as Array<{ id?: string; index?: number; label?: string; color?: string }>).map((r) => (
+            <Card
+              key={String(r.id)}
+              accent={r.color}
+              badge={String(r.index ?? '')}
+              title={String(r.label ?? r.id)}
+              subtitle={String(r.id)}
+              onDelete={() => deleteRelationType(String(r.id))}
+            />
+          ))}
+        </Pane>
+
+        <Pane title="Entidades" actionLabel="+ Adicionar" onAction={addEntity}>
+          {((parsedDoc?.entities ?? []) as Array<{ id?: string; name?: string; category?: string; parentId?: string }>).map((e) => {
+            const cat = ((parsedDoc?.categories ?? []) as Array<{ id?: string; color?: string }>).find((c) => c.id === e.category);
+            return (
+              <Card
+                key={String(e.id)}
+                accent={cat?.color}
+                title={String(e.name ?? e.id)}
+                subtitle={`${e.category}${e.parentId ? ` · ⊂ ${e.parentId}` : ''}`}
+                onDelete={() => deleteEntity(String(e.id))}
+              />
+            );
+          })}
+        </Pane>
+
+        <Pane title="Relações" actionLabel="+ Adicionar" onAction={addRelation}>
+          {((parsedDoc?.relations ?? []) as Array<{ id?: string; type?: string; source?: string; target?: string; label?: string }>).map((r) => {
+            const rt = ((parsedDoc?.relationTypes ?? []) as Array<{ id?: string; index?: number; color?: string }>).find((t) => t.id === r.type);
+            return (
+              <Card
+                key={String(r.id)}
+                accent={rt?.color}
+                badge={String(rt?.index ?? '')}
+                title={`${r.source} → ${r.target}`}
+                subtitle={String(r.label ?? r.type)}
+                onDelete={() => deleteRelation(String(r.id))}
+              />
+            );
+          })}
+        </Pane>
+      </div>
+
+      {/* ─── Bottom: status + actions + collapsible JSON ── */}
+      <div className="builder-footer">
+        <div className="builder-footer__left">
+          <button className="builder-btn" onClick={onStartEmpty}>Esqueleto mínimo</button>
+          <button className="builder-btn builder-btn--ghost" onClick={onLoadDemo}>Carregar demo</button>
+          <button className="builder-btn builder-btn--ghost" onClick={() => setJsonOpen((s) => !s)}>
+            {jsonOpen ? 'Esconder JSON' : 'Ver JSON ⌄'}
+          </button>
+        </div>
+        <div className={`builder-footer__status builder-footer__status--${status}`}>
+          {status === 'ok' && <span>✓ JSON válido — {count(text, 'entities')} entidades · {count(text, 'relations')} relações</span>}
+          {status === 'error' && <span>✗ {issues.length} {issues.length === 1 ? 'problema' : 'problemas'}</span>}
+          {status === 'idle' && <span>Aguardando…</span>}
+        </div>
+        <div className="builder-footer__right">
+          {dirty && <span className="builder-dirty">não aplicado</span>}
+          <button
+            className={`builder-btn builder-btn--primary${status === 'error' ? ' is-disabled' : ''}`}
+            disabled={status === 'error'}
+            onClick={onApply}
+          >
+            Aplicar
+          </button>
+          <button className="builder-btn" onClick={() => { onApply(); setViewMode('2d'); }}>
+            Aplicar e ir 2D
+          </button>
+          <button className="builder-btn builder-btn--ghost" onClick={() => { onApply(); setViewMode('3d'); }}>
+            Aplicar e ir 3D
+          </button>
+        </div>
+      </div>
+
+      {/* ─── JSON drawer ─────────────────────────────────── */}
+      {jsonOpen && (
+        <div className="builder-json-drawer">
+          <textarea
+            className="builder-textarea"
+            value={text}
+            onChange={(e) => { setText(e.target.value); setDirty(true); }}
+            spellCheck={false}
+          />
           {status === 'error' && (
-            <details open>
-              <summary>✗ {issues.length} {issues.length === 1 ? 'problema' : 'problemas'} encontrado{issues.length === 1 ? '' : 's'}</summary>
-              <ul className="builder-issues">
-                {issues.slice(0, 10).map((i, k) => (
-                  <li key={k}>
-                    <code>{i.path}</code> — {i.message}
-                  </li>
-                ))}
-                {issues.length > 10 && <li>… e mais {issues.length - 10}.</li>}
-              </ul>
-            </details>
+            <div className="builder-issues-list">
+              {issues.slice(0, 8).map((i, k) => (
+                <div key={k} className="builder-issue">
+                  <code>{i.path}</code> {i.message}
+                </div>
+              ))}
+              {issues.length > 8 && <div className="builder-issue">… e mais {issues.length - 8}.</div>}
+            </div>
           )}
-          {status === 'idle' && <span>Aguardando JSON…</span>}
-        </footer>
-      </section>
+        </div>
+      )}
     </div>
   );
 }
 
-/* ── Helpers ───────────────────────────────────────────────── */
+/* ── Helpers ───────────────────────────────────────────── */
 
 function buildEditorText(arch: ReturnType<typeof useArchitectureStore.getState>['architecture']): string {
   if (!arch) return JSON.stringify(EMPTY_SKELETON, null, 2);
-  // Strip the normalized-only fields before showing to the user
   const {
     entitiesById: _e, relationTypesById: _r, categoriesById: _c,
     maxStep: _m, relationsByEntity: _rbe, breakdownCodes: _bc, traceById: _t,
@@ -302,41 +409,66 @@ function buildEditorText(arch: ReturnType<typeof useArchitectureStore.getState>[
   return JSON.stringify(input, null, 2);
 }
 
-function safeParseCount(text: string, key: string): number {
+function count(text: string, key: string): number {
   try {
     const doc = JSON.parse(text);
     const arr = doc?.[key];
     return Array.isArray(arr) ? arr.length : 0;
-  } catch {
-    return 0;
-  }
+  } catch { return 0; }
 }
 
 const COLOR_PALETTE = [
   '#a855f7', '#2563eb', '#14b8a6', '#22c55e', '#eab308',
   '#ef4444', '#f59e0b', '#06b6d4', '#8b5cf6', '#64748b',
-  '#dc2626', '#16a34a', '#0ea5e9', '#ec4899', '#84cc16',
 ];
 function pickColor(seed: number): string {
   return COLOR_PALETTE[(seed - 1 + COLOR_PALETTE.length) % COLOR_PALETTE.length];
 }
 
-/* ── Small UI atoms ────────────────────────────────────────── */
+/* ── UI primitives ─────────────────────────────────────── */
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Pane({
+  title, actionLabel, onAction, children,
+}: {
+  title: string; actionLabel: string; onAction: () => void; children: React.ReactNode;
+}) {
   return (
-    <div className="builder-section">
-      <div className="builder-section__head">{title}</div>
-      <div className="builder-section__body">{children}</div>
-    </div>
+    <section className="builder-pane">
+      <header className="builder-pane__head">
+        <span>{title}</span>
+        <button className="builder-pane__add" onClick={onAction}>{actionLabel}</button>
+      </header>
+      <div className="builder-pane__body">
+        {children}
+        {!children || (Array.isArray(children) && children.length === 0) ? (
+          <div className="builder-pane__empty">— vazio —</div>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
-function Help({ heading, children }: { heading: string; children: React.ReactNode }) {
+function Card({
+  title, subtitle, accent, badge, onDelete,
+}: {
+  title: string;
+  subtitle?: string;
+  accent?: string;
+  badge?: string;
+  onDelete?: () => void;
+}) {
   return (
-    <div className="builder-help">
-      <div className="builder-help__head">{heading}</div>
-      <div className="builder-help__body">{children}</div>
+    <div className="builder-card" style={accent ? { borderLeftColor: accent } : undefined}>
+      {badge && (
+        <span className="builder-card__badge" style={accent ? { background: accent } : undefined}>{badge}</span>
+      )}
+      <div className="builder-card__body">
+        <div className="builder-card__title">{title}</div>
+        {subtitle && <div className="builder-card__sub">{subtitle}</div>}
+      </div>
+      {onDelete && (
+        <button className="builder-card__del" onClick={onDelete} title="Remover">×</button>
+      )}
     </div>
   );
 }
