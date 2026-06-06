@@ -29,6 +29,52 @@ const EDGE_TYPES = { architecture: ArchitectureEdge } as const;
 type HandleId = 'top' | 'right' | 'bottom' | 'left';
 
 /**
+ * For cross-row edges (≥ 2 rows apart), checks every intermediate-row
+ * card to see if the straight midpoint of the curve would crash into it.
+ * If yes, returns a signed horizontal shift (in px) that the edge should
+ * apply to its control points so the curve bows around the obstacle.
+ *
+ * Positive = push the bow rightward; negative = leftward.
+ *
+ * The shift is sized so the bezier midpoint clears the card by ~40 px.
+ * Because the bezier midpoint moves ~75% of the control-point shift,
+ * we multiply the required clearance by 1/0.75 ≈ 1.4.
+ */
+function computeObstacleShift(
+  src: { x: number; y: number; row: number } | undefined,
+  tgt: { x: number; y: number; row: number } | undefined,
+  layoutPositions: Map<string, { x: number; y: number; row: number }>,
+  nodeWidth: number,
+): number {
+  if (!src || !tgt) return 0;
+  if (Math.abs(src.row - tgt.row) < 2) return 0;
+
+  const minRow = Math.min(src.row, tgt.row);
+  const maxRow = Math.max(src.row, tgt.row);
+  const midX = (src.x + tgt.x) / 2 + nodeWidth / 2;
+
+  let bestShift = 0;
+  let bestAbs = 0;
+  for (const pos of layoutPositions.values()) {
+    if (pos.row <= minRow || pos.row >= maxRow) continue;
+    const left = pos.x - 30;
+    const right = pos.x + nodeWidth + 30;
+    if (midX < left || midX > right) continue;
+    // Collision. Push toward whichever side is closer.
+    const distLeft = midX - left;       // how far past the card's left edge
+    const distRight = right - midX;     // how far before the card's right edge
+    const shift = distLeft < distRight
+      ? -(distLeft + 40) * 1.4   // push left
+      : (distRight + 40) * 1.4;  // push right
+    if (Math.abs(shift) > bestAbs) {
+      bestAbs = Math.abs(shift);
+      bestShift = shift;
+    }
+  }
+  return bestShift;
+}
+
+/**
  * Pick the pair of (sourceHandle, targetHandle) that yields the most
  * natural connection given where the two cards sit relative to each other.
  *
@@ -263,6 +309,11 @@ function FlowCanvas() {
         : 0;
       const badgeT = rowDist > 1 ? 0.25 : 0.5;
 
+      // If any intermediate-row card sits in the straight path, compute
+      // a horizontal shift so the curve bows around it instead of
+      // crashing through.
+      const obstacleShift = computeObstacleShift(srcPos, tgtPos, layout.positions, NODE_WIDTH);
+
       const data: ArchitectureEdgeData = {
         relationId: relation.id,
         style: vs,
@@ -277,6 +328,7 @@ function FlowCanvas() {
         pairTotal: total,
         animated: isFlowy,
         badgeT,
+        obstacleShift,
       };
 
       return {

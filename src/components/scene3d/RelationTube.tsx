@@ -62,19 +62,11 @@ export function RelationTube({
     ];
   }, [from, to]);
 
-  // Dimmed tubes are a near-invisible hint of presence, no badge, no
-  // emissive glow. Mirrors the 2D behaviour the user asked for.
-  if (dimmed) {
-    return (
-      <mesh geometry={tubeGeom}>
-        <meshBasicMaterial
-          color={style.color}
-          transparent
-          opacity={0.05}
-        />
-      </mesh>
-    );
-  }
+  // When something is selected and this tube is unrelated to the
+  // selection, render NOTHING. The previous low-opacity version still
+  // showed as faint dark wires against the starfield, which the user
+  // called distracting. Cleaner to disappear entirely.
+  if (dimmed) return null;
 
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(relationId); }}>

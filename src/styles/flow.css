@@ -139,8 +139,8 @@
   z-index: 3;
 }
 .arch-node.is-dimmed {
-  opacity: 0.08;
-  filter: saturate(0.35) blur(0.4px);
+  opacity: 0.2;
+  filter: saturate(0.4);
   pointer-events: none;
 }
 

@@ -20,6 +20,8 @@ export interface ArchitectureEdgeData extends Record<string, unknown> {
   animated: boolean;
   /** Where to put the badge along the curve, in (0,1). 0.5 = midpoint. */
   badgeT: number;
+  /** Signed horizontal shift in px for obstacle avoidance (cross-row edges). */
+  obstacleShift: number;
 }
 
 /**
@@ -61,9 +63,14 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
   const perpY = dx / distance;
   const fan = d.pairOffset * 40;
 
-  const cp1x = sourceX + sNorm.x * extension + perpX * fan;
+  // Obstacle avoidance: signed horizontal X shift applied to both control
+  // points. The bezier bows around any intermediate-row card that sits on
+  // the straight path.
+  const ox = d.obstacleShift ?? 0;
+
+  const cp1x = sourceX + sNorm.x * extension + perpX * fan + ox;
   const cp1y = sourceY + sNorm.y * extension + perpY * fan;
-  const cp2x = targetX + tNorm.x * extension + perpX * fan;
+  const cp2x = targetX + tNorm.x * extension + perpX * fan + ox;
   const cp2y = targetY + tNorm.y * extension + perpY * fan;
 
   const path = `M ${sourceX} ${sourceY} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${targetX} ${targetY}`;
@@ -88,10 +95,9 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
   const animDash = d.animated && !isDimmed ? '12 8' : undefined;
   const strokeDashArray = animDash ?? dashFromStyle;
 
-  // When something is selected and this edge is unrelated, hide it almost
-  // entirely. The user asked for "ligações inativas" to disappear so the
-  // active ones read clearly. We don't render arrowheads or badges at all
-  // for dimmed edges and the stroke fades to a faint hint.
+  // When something is selected and this edge is unrelated, show only a
+  // faint outline so the user can still feel the overall project shape
+  // without it competing with the active relations.
   if (isDimmed) {
     return (
       <BaseEdge
@@ -99,8 +105,8 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
         path={path}
         style={{
           stroke: vs.color,
-          strokeWidth: 1,
-          opacity: 0.05,
+          strokeWidth: 1.2,
+          opacity: 0.12,
           fill: 'none',
         }}
       />
