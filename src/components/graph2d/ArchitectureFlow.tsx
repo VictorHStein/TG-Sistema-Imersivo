@@ -156,6 +156,45 @@ function FitOnChange({ depend, entityIds }: { depend: unknown[]; entityIds: stri
   return null;
 }
 
+/**
+ * When a single entity becomes selected, smoothly re-frame the viewport
+ * onto that entity AND its direct neighbours so the user can read every
+ * incident relation without panning.
+ *
+ *   - selectedEntityId changes → fit-to (entity + neighbours)
+ *   - selectedEntityId cleared  → fit-to (everything)
+ *
+ * The set of nodes to focus on is supplied by the parent (already computed
+ * for the dim/highlight logic).
+ */
+function FitOnSelection({
+  selectedId,
+  focusIds,
+  allEntityIds,
+}: {
+  selectedId: string | null;
+  focusIds: string[];
+  allEntityIds: string[];
+}) {
+  const { fitView } = useReactFlow();
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const nodes = selectedId
+        ? focusIds.map((id) => ({ id }))
+        : allEntityIds.map((id) => ({ id }));
+      fitView({
+        padding: selectedId ? 0.25 : 0.06,
+        duration: 600,
+        maxZoom: selectedId ? 1.0 : 1.4,
+        nodes,
+      });
+    }, 80);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+  return null;
+}
+
 function FlowCanvas() {
   const architecture = useArchitectureStore((s) => s.architecture);
   const selectedEntityId = useArchitectureStore((s) => s.selectedEntityId);
@@ -436,6 +475,11 @@ function FlowCanvas() {
           <FitOnChange
             depend={[architecture?.metadata.version, visibleCategories.size, visibleRelationTypes.size, explorationMode, currentStep]}
             entityIds={visibleEntities.map((e) => e.id)}
+          />
+          <FitOnSelection
+            selectedId={selectedEntityId}
+            focusIds={focusedNeighbors ? [...focusedNeighbors.entityIds] : []}
+            allEntityIds={visibleEntities.map((e) => e.id)}
           />
           <Background variant={BackgroundVariant.Dots} color="#1e3a5f55" gap={32} size={1.2} />
           <Controls showInteractive={false} />

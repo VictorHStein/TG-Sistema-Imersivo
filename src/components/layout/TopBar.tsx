@@ -1,6 +1,7 @@
 import { useArchitectureStore } from '../../state/architectureStore';
 import { JsonUploadPanel } from '../json/JsonUploadPanel';
 import { ViewModeTabs } from './ViewModeTabs';
+import { EntitySearch } from './EntitySearch';
 
 export function TopBar() {
   const architecture = useArchitectureStore((s) => s.architecture);
@@ -16,6 +17,7 @@ export function TopBar() {
 
       <div className="top-bar__center">
         <ViewModeTabs />
+        <EntitySearch />
       </div>
 
       <div className="top-bar__actions">
