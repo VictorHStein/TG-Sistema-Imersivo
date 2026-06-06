@@ -115,20 +115,31 @@
   transform: translateY(-1px);
 }
 
+/*
+ * Selection hierarchy is meant to read at a glance:
+ *   • is-selected   → bright, glowing, full accent (THE node)
+ *   • is-highlighted→ visible but clearly secondary; related via relations
+ *                     but not the focus (faded, no glow, thin outline)
+ *   • is-dimmed     → unrelated; pushed into the background
+ */
 .arch-node.is-selected {
   border-color: var(--node-color);
-  background: color-mix(in srgb, var(--node-color) 14%, rgba(13,25,46,0.92));
+  background: color-mix(in srgb, var(--node-color) 16%, rgba(13,25,46,0.95));
   box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--node-color) 40%, transparent),
-    0 0 28px color-mix(in srgb, var(--node-color) 35%, transparent);
+    0 0 0 3px color-mix(in srgb, var(--node-color) 45%, transparent),
+    0 0 32px color-mix(in srgb, var(--node-color) 40%, transparent);
+  z-index: 5;
 }
 .arch-node.is-highlighted {
-  border-color: var(--node-color);
-  background: color-mix(in srgb, var(--node-color) 8%, rgba(13,25,46,0.92));
+  /* Just an outline accent so the user can spot related nodes — no glow. */
+  border-color: color-mix(in srgb, var(--node-color) 45%, transparent);
+  background: rgba(13,25,46,0.85);
+  opacity: 0.7;
+  filter: saturate(0.85);
 }
 .arch-node.is-dimmed {
-  opacity: 0.32;
-  filter: saturate(0.4);
+  opacity: 0.15;
+  filter: saturate(0.25) blur(0.3px);
 }
 
 /* Shape variations */

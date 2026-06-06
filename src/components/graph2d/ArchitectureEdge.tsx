@@ -21,42 +21,59 @@ export interface ArchitectureEdgeData extends Record<string, unknown> {
 }
 
 /**
- * Quadratic-bezier edge with:
- *  - control point offset perpendicular to (source→target) so parallel edges
- *    between the same pair never overlap
- *  - directional arrowhead at the target
- *  - numeric badge over the midpoint
- *  - optional animated dash flow for power/data/command relations
+ * Edge with two routing strategies, depending on geometry:
+ *
+ *   • Intra-row  (sourceY ≈ targetY)  — typical for subsystem↔subsystem
+ *     interfaces. The edge arcs HIGH above the row so it never crosses
+ *     intermediate cards. Parallel edges fan out vertically.
+ *
+ *   • Cross-row  — quadratic bezier with a perpendicular control offset
+ *     so parallel edges don't overlap.
+ *
+ * The numeric badge sits at the curve's midpoint. The text relation-type
+ * label is NOT rendered on the edge anymore — the colour + numbered badge
+ * already encode the type, and stacking a text pill on every selected edge
+ * (when one entity has 6+ relations) produces visual noise.
  */
 function ArchitectureEdgeImpl(props: EdgeProps) {
   const { id, sourceX, sourceY, targetX, targetY, data } = props;
   const d = data as ArchitectureEdgeData;
   const { style: vs, isSelected, isDimmed, isEmphasized, relationIndex } = d;
 
-  // Perpendicular offset → split parallel edges
   const dx = targetX - sourceX;
   const dy = targetY - sourceY;
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  const px = -dy / len;
-  const py = dx / len;
+  const isIntraRow = Math.abs(dy) < 12;
 
-  // Base "curl" — always curve a bit so straight-down edges still look organic
-  const baseCurl = Math.min(len * 0.18, 60);
-  const parallelOffset = d.pairOffset * 60; // 60px between adjacent parallels
-  const offset = baseCurl + parallelOffset;
+  let mx: number;
+  let my: number;
 
-  const mx = (sourceX + targetX) / 2 + px * offset;
-  const my = (sourceY + targetY) / 2 + py * offset;
+  if (isIntraRow) {
+    // Force a strong upward arc above the row. Tall enough to clear card
+    // heights (~86px) plus padding. Parallel edges fan out by index.
+    const horizDist = Math.abs(dx);
+    const arcHeight = Math.max(110, Math.min(horizDist * 0.32, 220));
+    mx = (sourceX + targetX) / 2 + d.pairOffset * 22;
+    my = (sourceY + targetY) / 2 - arcHeight - Math.abs(d.pairOffset) * 18;
+  } else {
+    // Cross-row: perpendicular bezier with parallel-edge offset.
+    const px = -dy / len;
+    const py = dx / len;
+    const baseCurl = Math.min(len * 0.18, 60);
+    const parallelOffset = d.pairOffset * 60;
+    const offset = baseCurl + parallelOffset;
+    mx = (sourceX + targetX) / 2 + px * offset;
+    my = (sourceY + targetY) / 2 + py * offset;
+  }
 
   const path = `M ${sourceX} ${sourceY} Q ${mx} ${my} ${targetX} ${targetY}`;
 
-  // Badge sits at the bezier midpoint (t=0.5)
+  // Bezier midpoint at t=0.5
   const labelX = 0.25 * sourceX + 0.5 * mx + 0.25 * targetX;
   const labelY = 0.25 * sourceY + 0.5 * my + 0.25 * targetY;
 
   const markerId = `arrow-${d.relationId}`;
 
-  // Stroke dash either from line style OR from animation
   const dashFromStyle = vs.dashArray === 'none' ? undefined : vs.dashArray;
   const animDash = d.animated && !isDimmed ? '12 8' : undefined;
   const strokeDashArray = animDash ?? dashFromStyle;
@@ -102,13 +119,12 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
         id={id}
         path={path}
         style={{
-          stroke: isDimmed ? '#2a3a55' : vs.color,
+          stroke: isDimmed ? '#1f3050' : vs.color,
           strokeWidth: vs.strokeWidth,
           strokeDasharray: strokeDashArray,
           strokeLinecap: 'round',
-          opacity: vs.opacity,
+          opacity: isDimmed ? 0.18 : vs.opacity,
           fill: 'none',
-          // Animate dash flow
           animation: d.animated && !isDimmed
             ? `arch-edge-flow ${isSelected ? 1.4 : 2.2}s linear infinite`
             : undefined,
@@ -116,7 +132,9 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
         markerEnd={vs.isDirected && !isDimmed ? `url(#${markerId})` : undefined}
       />
 
-      {/* Numeric badge */}
+      {/* Numeric badge — only when not dimmed. Tooltip carries the label
+          and description so the user can identify the relation without us
+          stacking pills on every edge. */}
       {!isDimmed && (
         <EdgeLabelRenderer>
           <div
@@ -135,25 +153,6 @@ function ArchitectureEdgeImpl(props: EdgeProps) {
             title={`${relationIndex}. ${d.relationTypeLabel}${d.description ? ` — ${d.description}` : ''}`}
           >
             <RelationBadge index={relationIndex} color={vs.color} emphasized={isEmphasized} selected={isSelected} />
-          </div>
-        </EdgeLabelRenderer>
-      )}
-
-      {/* Pill label when selected / emphasized */}
-      {(isSelected || isEmphasized) && !isDimmed && d.relationTypeLabel && (
-        <EdgeLabelRenderer>
-          <div
-            className="arch-edge-pill"
-            style={{
-              position: 'absolute',
-              transform: `translate(-50%, calc(-50% + 24px)) translate(${labelX}px,${labelY}px)`,
-              pointerEvents: 'none',
-              background: 'rgba(8,14,30,0.92)',
-              color: vs.color,
-              border: `1px solid ${vs.color}`,
-            }}
-          >
-            {d.relationTypeLabel}
           </div>
         </EdgeLabelRenderer>
       )}

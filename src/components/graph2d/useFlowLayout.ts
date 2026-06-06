@@ -7,8 +7,8 @@ import type {
 
 export const NODE_WIDTH = 200;
 export const NODE_HEIGHT = 86;
-const COL_GAP = 32;
-const ROW_GAP = 110;
+const COL_GAP = 80;   // horizontal breathing room between siblings
+const ROW_GAP = 200;  // vertical room for arcing intra-row edges + arrows
 
 /**
  * Layered top-to-bottom layout: each category is a horizontal row.
