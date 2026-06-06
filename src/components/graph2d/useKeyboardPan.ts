@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useReactFlow } from '@xyflow/react';
+import { useReactFlow, useStoreApi } from '@xyflow/react';
 import { useArchitectureStore } from '../../state/architectureStore';
 import { NODE_WIDTH, NODE_HEIGHT } from './useFlowLayout';
 import { computeFlowLayout } from './useFlowLayout';
@@ -12,28 +12,33 @@ import { computeVisibleEntities } from '../../state/architectureStore';
  *   A / D → pan left / right
  *   Q / − → zoom out
  *   E / + → zoom in
- *   Shift  → 3× speed sprint
+ *   Shift  → 3× sprint
  *
  * Pan
- *   Speed scales with 1 / zoom so screen-space movement stays constant
- *   regardless of zoom level.
+ *   Speed scales with 1 / zoom so screen-space movement stays constant.
  *
- * Zoom — anchors on selected entity when one exists
- *   Default React-Flow zoom is around viewport (0,0). Here, if the user
- *   has an entity selected, we ZOOM AROUND THAT ENTITY: as the zoom
- *   changes, the selected entity stays under the same screen pixel.
- *   That's what users expect — "zoom in on what I'm looking at".
+ * Zoom
+ *   Step is small (0.02 per frame) so the user can feather the zoom.
+ *   Holding Shift gives 3× zoom speed.
  *
- *   Math: screenPos = worldPos × zoom + viewport. We want screenPos
- *   constant, so newViewport = oldViewport + worldPos × (oldZoom − newZoom).
+ * Zoom anchor
+ *   - When an entity is selected, the zoom pivots on its world centre,
+ *     so the selected card stays glued to the same screen pixel.
+ *   - When nothing is selected, the zoom pivots on the SCREEN CENTRE
+ *     (whatever is in the middle of the canvas right now), which is
+ *     what the user expects from a typical viewer.
+ *
+ *   Math (standard pinch-zoom):
+ *     newViewport = oldViewport + worldAnchor × (oldZoom − newZoom)
  */
 const PAN_BASE = 10;
-const ZOOM_STEP = 0.04;
+const ZOOM_STEP = 0.02;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2.5;
 
 export function useKeyboardPan(active: boolean = true): void {
   const { getViewport, setViewport } = useReactFlow();
+  const store = useStoreApi();
   const keys = useRef<Record<string, boolean>>({});
   const rafRef = useRef<number | null>(null);
 
@@ -94,10 +99,12 @@ export function useKeyboardPan(active: boolean = true): void {
         if (dz !== 0) {
           newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, v.zoom + dz));
 
-          // Anchor zoom on the selected entity if there is one
-          const anchor = getSelectedAnchor();
+          // Pick a world-space anchor for the zoom pivot
+          const anchor =
+            getSelectedAnchor() ??
+            getScreenCenterAnchor(store, v);
+
           if (anchor) {
-            // Keep the anchor under the same screen pixel during zoom.
             newX = newX + anchor.x * (v.zoom - newZoom);
             newY = newY + anchor.y * (v.zoom - newZoom);
           }
@@ -117,13 +124,12 @@ export function useKeyboardPan(active: boolean = true): void {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       keys.current = {};
     };
-  }, [active, getViewport, setViewport]);
+  }, [active, getViewport, setViewport, store]);
 }
 
 /**
- * Returns the world-space centre point of whichever entity is currently
- * selected — or null. Used by the zoom code so Q / E pivot around the
- * thing the user is looking at instead of the viewport origin.
+ * World-space centre of the currently selected entity, or null if there
+ * isn't one. Triggers the "zoom around the selected card" behaviour.
  */
 function getSelectedAnchor(): { x: number; y: number } | null {
   const s = useArchitectureStore.getState();
@@ -140,5 +146,24 @@ function getSelectedAnchor(): { x: number; y: number } | null {
   return {
     x: pos.x + NODE_WIDTH / 2,
     y: pos.y + NODE_HEIGHT / 2,
+  };
+}
+
+/**
+ * World-space coordinate of the current screen-centre. Used as the
+ * fallback zoom anchor when nothing is selected — what the user is
+ * "looking at" in the canvas right now stays under the same pixel.
+ */
+function getScreenCenterAnchor(
+  store: ReturnType<typeof useStoreApi>,
+  v: { x: number; y: number; zoom: number },
+): { x: number; y: number } | null {
+  const domNode = store.getState().domNode as HTMLElement | null | undefined;
+  if (!domNode) return null;
+  const screenCx = domNode.clientWidth / 2;
+  const screenCy = domNode.clientHeight / 2;
+  return {
+    x: (screenCx - v.x) / v.zoom,
+    y: (screenCy - v.y) / v.zoom,
   };
 }

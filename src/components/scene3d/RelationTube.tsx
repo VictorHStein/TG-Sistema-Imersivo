@@ -53,32 +53,36 @@ export function RelationTube({
     const start = new THREE.Vector3(...from);
     const end = new THREE.Vector3(...to);
     const lineLen = start.distanceTo(end) || 1;
-    const baseBend = lineLen * 0.2;
+    // Bigger base bend → tubes arch higher and don't crowd the straight
+    // line between endpoints. Adjacent tubes can pass through different
+    // altitudes instead of sliding past each other at the same height.
+    const baseBend = lineLen * 0.3;
 
     // Start with the world-up direction
     const bendDir = new THREE.Vector3(0, 1, 0);
 
-    // Rotate the bend direction around the source→target axis by an
-    // angle proportional to pairOffset. Each parallel goes a different
-    // way around the line so the tubes fan out in 3D.
+    // Rotate the bend direction around the source→target axis. The
+    // multiplier was 0.5 rad (~28°) — bumped to 0.85 rad (~49°) so
+    // parallels go to clearly distinct sides of the line.
     if (pairOffset !== 0) {
       const lineDir = end.clone().sub(start).normalize();
-      // Avoid degenerate axis when line is vertical
       if (Math.abs(lineDir.y) > 0.999) lineDir.set(0, 0, 1);
-      const angle = pairOffset * 0.5; // ~28° between adjacent parallels
+      const angle = pairOffset * 0.85;
       bendDir.applyAxisAngle(lineDir, angle);
     }
 
-    // Scale the bend slightly for outer parallels so they bow further
-    const bendMag = baseBend * (1 + Math.abs(pairOffset) * 0.25);
+    // Outer parallels arch a bit higher than the inner ones so they
+    // never touch even when angles overlap visually from one viewpoint.
+    const bendMag = baseBend * (1 + Math.abs(pairOffset) * 0.45);
 
     const mid = start.clone().add(end).multiplyScalar(0.5);
     mid.add(bendDir.multiplyScalar(bendMag));
 
     const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
-    const geom = new THREE.TubeGeometry(curve, 24, style.strokeWidth * 0.04, 8, false);
+    // Tubes themselves are slightly thinner, so they read as lines, not
+    // pipes — less chance of two lit-up tubes blurring into one blob.
+    const geom = new THREE.TubeGeometry(curve, 28, style.strokeWidth * 0.032, 8, false);
 
-    // Actual curve midpoint at t=0.5 = 0.25*start + 0.5*mid + 0.25*end
     const t05 = start.clone().multiplyScalar(0.25)
       .add(mid.clone().multiplyScalar(0.5))
       .add(end.clone().multiplyScalar(0.25));
