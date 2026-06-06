@@ -37,6 +37,10 @@ export function NavHint({ mode }: { mode: '2d' | '3d' }) {
             <span className="nav-hint__sep">descer / subir</span>
           </div>
           <div className="nav-hint__line">
+            <Kbd>←</Kbd> <Kbd>→</Kbd> <Kbd>↑</Kbd> <Kbd>↓</Kbd>
+            <span className="nav-hint__sep">girar em torno do alvo</span>
+          </div>
+          <div className="nav-hint__line">
             <Kbd>Shift</Kbd>
             <span className="nav-hint__sep">3× mais rápido</span>
           </div>

@@ -155,6 +155,37 @@ function SceneContent({
 
   const layout = use3DLayout(architecture);
 
+  /**
+   * Pre-compute pair offsets: for each visible relation, how many
+   * sibling relations share the same node pair (undirected), and what
+   * is this one's index within that group?
+   *
+   * The offset goes into RelationTube where it rotates the bend
+   * direction around the source→target axis, so parallels fan out in
+   * 3D instead of stacking on top of each other.
+   */
+  const pairData = useMemo(() => {
+    const counts = new Map<string, number>();
+    const order = new Map<string, number>();
+    for (const r of visibleRelations) {
+      const a = r.source < r.target ? r.source : r.target;
+      const b = r.source < r.target ? r.target : r.source;
+      const key = `${a}|${b}`;
+      const before = counts.get(key) ?? 0;
+      order.set(r.id, before);
+      counts.set(key, before + 1);
+    }
+    const out = new Map<string, number>();
+    for (const r of visibleRelations) {
+      const a = r.source < r.target ? r.source : r.target;
+      const b = r.source < r.target ? r.target : r.source;
+      const total = counts.get(`${a}|${b}`) ?? 1;
+      const idx = order.get(r.id) ?? 0;
+      out.set(r.id, total > 1 ? idx - (total - 1) / 2 : 0);
+    }
+    return out;
+  }, [visibleRelations]);
+
   const focusedNeighbors = useMemo(() => {
     if (!architecture || (!selectedEntityId && !focusedSubsystemId)) return null;
     const focusId = selectedEntityId ?? focusedSubsystemId!;
@@ -241,7 +272,7 @@ function SceneContent({
         );
       })}
 
-      {/* Relation tubes */}
+      {/* Relation tubes — pair offsets are pre-computed in pairData */}
       {visibleRelations.map((relation) => {
         const rt = architecture.relationTypesById[relation.type];
         const fromPos = layout.positions.get(relation.source);
@@ -249,6 +280,7 @@ function SceneContent({
         if (!fromPos || !toPos) return null;
         const source = architecture.entitiesById[relation.source];
         const target = architecture.entitiesById[relation.target];
+        const pairOffset = pairData.get(relation.id) ?? 0;
 
         const isSelected = relation.id === selectedRelationId;
         const inFocus = focusedNeighbors?.relationIds.has(relation.id) ?? false;
@@ -276,6 +308,7 @@ function SceneContent({
             emphasizedByFilter={inFocus}
             dimmed={isDimmed}
             showBadge={showBadge && !isDimmed}
+            pairOffset={pairOffset}
             onSelect={selectRelation}
           />
         );

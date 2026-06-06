@@ -28,7 +28,7 @@ import { computeVisibleEntities } from '../../state/architectureStore';
  *   constant, so newViewport = oldViewport + worldPos × (oldZoom − newZoom).
  */
 const PAN_BASE = 10;
-const ZOOM_STEP = 0.08;
+const ZOOM_STEP = 0.04;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2.5;
 

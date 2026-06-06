@@ -18,6 +18,13 @@ interface RelationTubeProps {
    */
   dimmed: boolean;
   showBadge: boolean;
+  /**
+   * Symmetric offset for parallel tubes between the same node pair
+   * (… −1, 0, +1 …). The bend direction rotates by `pairOffset × 28°`
+   * around the source→target axis, so multiple relations between EPS
+   * and OBC don't stack on top of each other.
+   */
+  pairOffset: number;
   onSelect: (id: string) => void;
 }
 
@@ -25,8 +32,8 @@ interface RelationTubeProps {
  * Curved tube connecting two entity centers in 3D. Color and thickness come
  * from the unified relation style (so 2D and 3D look the same).
  *
- * A numeric badge is rendered with <Html> in the middle of the curve when
- * the relation is selected, emphasized, or cross-category.
+ * Parallel tubes between the same pair fan out by rotating their bend
+ * direction around the source→target axis, so they no longer overlap.
  */
 export function RelationTube({
   relationId,
@@ -38,34 +45,50 @@ export function RelationTube({
   emphasizedByFilter,
   dimmed,
   showBadge,
+  pairOffset,
   onSelect,
 }: RelationTubeProps) {
-  const tubeGeom = useMemo(() => {
+  // Bend direction + midpoint, accounting for pair offset
+  const { tubeGeom, midPoint } = useMemo(() => {
     const start = new THREE.Vector3(...from);
     const end = new THREE.Vector3(...to);
+    const lineLen = start.distanceTo(end) || 1;
+    const baseBend = lineLen * 0.2;
+
+    // Start with the world-up direction
+    const bendDir = new THREE.Vector3(0, 1, 0);
+
+    // Rotate the bend direction around the source→target axis by an
+    // angle proportional to pairOffset. Each parallel goes a different
+    // way around the line so the tubes fan out in 3D.
+    if (pairOffset !== 0) {
+      const lineDir = end.clone().sub(start).normalize();
+      // Avoid degenerate axis when line is vertical
+      if (Math.abs(lineDir.y) > 0.999) lineDir.set(0, 0, 1);
+      const angle = pairOffset * 0.5; // ~28° between adjacent parallels
+      bendDir.applyAxisAngle(lineDir, angle);
+    }
+
+    // Scale the bend slightly for outer parallels so they bow further
+    const bendMag = baseBend * (1 + Math.abs(pairOffset) * 0.25);
+
     const mid = start.clone().add(end).multiplyScalar(0.5);
-    const bend = (start.distanceTo(end) || 1) * 0.18;
-    mid.y += bend; // arc upwards a bit for readability
+    mid.add(bendDir.multiplyScalar(bendMag));
+
     const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
-    return new THREE.TubeGeometry(curve, 24, style.strokeWidth * 0.04, 8, false);
-  }, [from, to, style.strokeWidth]);
+    const geom = new THREE.TubeGeometry(curve, 24, style.strokeWidth * 0.04, 8, false);
 
-  const midPoint: [number, number, number] = useMemo(() => {
-    // The curve's actual midpoint at t=0.5: midOfStartEnd + bend/2 in Y.
-    const dx = from[0] - to[0];
-    const dz = from[2] - to[2];
-    const bend = Math.sqrt(dx * dx + dz * dz) * 0.18;
-    return [
-      (from[0] + to[0]) / 2,
-      (from[1] + to[1]) / 2 + bend * 0.5,
-      (from[2] + to[2]) / 2,
-    ];
-  }, [from, to]);
+    // Actual curve midpoint at t=0.5 = 0.25*start + 0.5*mid + 0.25*end
+    const t05 = start.clone().multiplyScalar(0.25)
+      .add(mid.clone().multiplyScalar(0.5))
+      .add(end.clone().multiplyScalar(0.25));
 
-  // When something is selected and this tube is unrelated to the
-  // selection, render NOTHING. The previous low-opacity version still
-  // showed as faint dark wires against the starfield, which the user
-  // called distracting. Cleaner to disappear entirely.
+    return {
+      tubeGeom: geom,
+      midPoint: [t05.x, t05.y, t05.z] as [number, number, number],
+    };
+  }, [from, to, style.strokeWidth, pairOffset]);
+
   if (dimmed) return null;
 
   return (
