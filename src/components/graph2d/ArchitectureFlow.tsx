@@ -197,8 +197,8 @@ function FitOnSelection({
   return null;
 }
 
-function FlowCanvas() {
-  useKeyboardPan();
+function FlowCanvas({ active = true }: { active?: boolean }) {
+  useKeyboardPan(active);
   const architecture = useArchitectureStore((s) => s.architecture);
   const selectedEntityId = useArchitectureStore((s) => s.selectedEntityId);
   const selectedRelationId = useArchitectureStore((s) => s.selectedRelationId);
@@ -496,10 +496,10 @@ function FlowCanvas() {
 
 void NODE_HEIGHT;
 
-export function ArchitectureFlow() {
+export function ArchitectureFlow({ active = true }: { active?: boolean }) {
   return (
     <ReactFlowProvider>
-      <FlowCanvas />
+      <FlowCanvas active={active} />
     </ReactFlowProvider>
   );
 }

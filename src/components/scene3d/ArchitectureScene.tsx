@@ -126,8 +126,10 @@ function CameraResetWatcher({
 
 function SceneContent({
   controlsRef,
+  active,
 }: {
   controlsRef: React.MutableRefObject<OrbitControlsImpl | null>;
+  active: boolean;
 }) {
   const architecture = useArchitectureStore((s) => s.architecture);
   const selectedEntityId = useArchitectureStore((s) => s.selectedEntityId);
@@ -240,7 +242,7 @@ function SceneContent({
         focusTick={cameraFocusOnSelectedTick}
         controlsRef={controlsRef}
       />
-      <WASDFlyCam controlsRef={controlsRef} />
+      <WASDFlyCam controlsRef={controlsRef} active={active} />
 
       {/* Entity meshes */}
       {visibleEntities.map((entity) => {
@@ -319,7 +321,7 @@ function SceneContent({
 
 /* ── Main component ─────────────────────────────────────────── */
 
-export function ArchitectureScene() {
+export function ArchitectureScene({ active = true }: { active?: boolean }) {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const architecture = useArchitectureStore((s) => s.architecture);
   const selectEntity = useArchitectureStore((s) => s.selectEntity);
@@ -353,7 +355,7 @@ export function ArchitectureScene() {
       >
         <color attach="background" args={['#02050f']} />
         <Suspense fallback={null}>
-          <SceneContent controlsRef={controlsRef} />
+          <SceneContent controlsRef={controlsRef} active={active} />
         </Suspense>
         <CameraControls controlsRef={controlsRef} autoRotate={autoRotate} />
       </Canvas>

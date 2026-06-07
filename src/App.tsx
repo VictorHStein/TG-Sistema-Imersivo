@@ -8,6 +8,7 @@ import { ArchitectureFlow } from './components/graph2d/ArchitectureFlow';
 import { ArchitectureScene } from './components/scene3d/ArchitectureScene';
 import { JsonErrorPanel } from './components/json/JsonErrorPanel';
 import { TutorialView } from './components/layout/TutorialView';
+import { SplitCanvas } from './components/layout/SplitCanvas';
 
 export default function App() {
   const viewMode = useArchitectureStore((s) => s.viewMode);
@@ -56,13 +57,7 @@ export default function App() {
           {isTutorial && <TutorialView />}
           {!isTutorial && architecture && viewMode === '2d' && <ArchitectureFlow />}
           {!isTutorial && architecture && viewMode === '3d' && <ArchitectureScene />}
-          {!isTutorial && architecture && viewMode === 'split' && (
-            <div className="split-canvas">
-              <div className="split-canvas__cell"><ArchitectureFlow /></div>
-              <div className="split-canvas__divider" />
-              <div className="split-canvas__cell"><ArchitectureScene /></div>
-            </div>
-          )}
+          {!isTutorial && architecture && viewMode === 'split' && <SplitCanvas />}
         </main>
 
         {!isTutorial && <SidePanel />}
